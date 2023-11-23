@@ -1,4 +1,6 @@
-# pdbcraft
+<h1 align="center">
+<img src="./branding/pdbcraft_logo.png" width="300">
+</h1><br>
 
 ## Introduction
 
@@ -37,7 +39,7 @@ To install **pdbcraft**:
 * Install it with ``pip`` by running:
 
   ```shell
-  pip install ./pdbcraft
+  pip install ./pdbcraft-main
   ```
 
 ## Documentation
