@@ -1,6 +1,4 @@
-<h1 align="center">
 <img src="./branding/pdbcraft_logo.png" width="300">
-</h1><br>
 
 ## Introduction
 
