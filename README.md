@@ -20,6 +20,26 @@ With **pdbcraft**, you can:
 
 However, **pdbcraft** does not perform complex tasks such as structural alignments, hydrogen bond detection, or secondary structure assignment. For these operations, we recommend packages such as [BioPython](https://biopython.org/docs/1.75/api/index.html), which covers a broader scope.
 
+## Requirements
+
+**pdbcraft** requires Python version 3.11 or higher.
+
+## Installation
+
+To install **pdbcraft**:
+
+* Download it as a zipped file by clicking on [this link](https://github.com/Center-for-Health-Data-Science/pdbcraft/archive/refs/heads/main.zip).
+
+* Unzip it in your preferred location.
+
+* (Optional) Activate the Python virtual environment where you want to install it.
+
+* Install it with ``pip`` by running:
+
+  ```shell
+  pip install ./pdbcraft
+  ```
+
 ## Documentation
 
 Detailed **documentation** with a description of the API and full-fledged tutorials can be found [here]().
