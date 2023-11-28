@@ -636,7 +636,7 @@ class PDBStructure:
                     # to the new numbering
                     try:
 
-                        atom_record_new = mapping[mod][atom]
+                        atom_record_new = mapping[mod][atom_record]
 
                     # If the atom was not found in the mapping
                     # (because, for instance, it was removed
@@ -1248,7 +1248,7 @@ class PDBStructure:
                     # with the result of the recursion
                     struct[key] = \
                         recursive_step(\
-                            struct = value,
+                            struct = sub_struct,
                             target_depth = target_depth,
                             attribute = attribute,
                             mapping = mapping,
@@ -1425,12 +1425,12 @@ class PDBStructure:
                             current_atom_count += 1
 
                         # Recursively process the subdictionary
-                        struct[k], current_atom_count, oldnum2newnum = \
+                        struct[key], current_atom_count, oldnum2newnum = \
                             recursive_step(\
                                 struct = sub_struct,
                                 current_atom_count = current_atom_count,
                                 current_depth = current_depth + 1,
-                                current_path = current_path + (k,),
+                                current_path = current_path + (key,),
                                 oldnum2newnum = oldnum2newnum)
                 
                 # Return the structure, the current atom count,
@@ -1445,7 +1445,7 @@ class PDBStructure:
         # Get the updated data for the atoms and the mapping
         # between the old numbering and the new numbering
         updated_atom_data, _, oldnum2newnum = \
-            recursive_step(d = copy.deepcopy(self.atom_data),
+            recursive_step(struct = copy.deepcopy(self.atom_data),
                            current_atom_count = start - 2)
 
         # Update the data for the atoms
