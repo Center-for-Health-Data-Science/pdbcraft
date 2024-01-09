@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- Mode: python; tab-width: 4; indent-tabs-mode:nil; coding:utf-8 -*-
 
-#    utils.py
+#    structure.py
 #
-#    Utilities to modify/write out data parsed from a PDB file.
+#    Utilities to manipulate atomic structures.
 #
 #    Copyright (C) 2023 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
@@ -35,415 +35,7 @@ import re
 logger = log.getLogger(__name__)
 
 
-class _StructureParser:
-
-    """
-    Class implementing a generic parser for structures' files.
-    """
-
-
-    #------------------------ Initialization -------------------------#
-
-
-    def __init__(self):
-        """Initialize the parser.
-        """
-        pass
-
-
-    #------------------------ Public methods -------------------------#
-
-
-    def parse(self,
-              pdb_id = None,
-              file = None):
-        """Parse a structure.
-
-        Parameters
-        ----------
-        pdb_id : ``str``, optional
-            ID of the structure in the Protein Data Bank (case
-            insensitive).
-
-        file : ``str``, optional
-            File to initialize the structure from. If 
-            ``pdb_id`` is also passed, it will be the file
-            where the file corresponding to the given ID
-            will be saved.
-        """
-
-        # Get the data from the passed PDB file or from
-        # the Protein Data Bank
-        atom_data, conect_data = self._parse_file(file = file)
-
-        # Get the name of the file (without the path leading
-        # to it, if any)
-        file_name, _ = os.path.splitext(os.path.basename(file))
-
-        # Create the structure
-        struct = PDBStructure(atom_data = atom_data,
-                              conect_data = conect_data,
-                              name = file_name)
-
-        # Return the structure
-        return struct
-
-
-class PDBParser(_StructureParser):
-
-    """
-    Class to parse PDB files.
-    """
-
-
-    #------------------------ Private methods ------------------------#
-
-
-    def _parse_file(self,
-                    file):
-        """Parse a PDB file.
-
-        Parameters
-        ----------
-        file : ``str``
-            The PDB file to be parsed.
-
-        Returns
-        -------
-        atom_data : ``dict``
-            A dictionary containing the data parsed from the
-            atomic coordinates' section of the PDB file.
-
-            The dictionary remembers the order in which the data
-            were added, which is also the order in which they
-            were parsed from the PDB file.
-
-        conect_data : ``dict``
-            A dictionary the records parsed from the CONECT
-            section of the PDB file.
-
-            The dictionary remembers the order in which the data
-            were added, which is also the order in which they
-            were parsed from the PDB file.
-        """
-
-
-        #---------------------- Initialization -----------------------#
-
-
-        # Initialize an empty dictionary to store the data parsed
-        # from the atomic coordinates' section of the file
-        atom_data = {}
-
-        # Initialize an empty dictionary to store the data parsed
-        # from the CONECT section of the file
-        conect_data = {}
-
-        # Initialize an empty set to store the unique models found
-        # in the file
-        unique_models = set()
-
-        # Initialize the current model number to 1
-        model = 1
-
-        # Initialize the ID to be used for unnamed chains
-        unknown_chain_id = ""
-
-        # Initialize the ID to be used for unknown segments
-        unknown_seg_id = ""
-
-
-        #-------------------------- Parsing --------------------------#
-
-
-        # Open the PDB file
-        with open(file, "r") as f:
-
-            # For each line in the file (start enumerating from 1)
-            for line_ix, line in enumerate(f, start = 1):
-
-                # If the line is empty:
-                if re.match(r"^\s*$", line):
-
-                    # Skip the line
-                    continue
-
-                # Remove the trailing newline character from the line
-                line = line.rstrip("\n")
-
-                # Get the record's header
-                header = line[0:6]
-
-                #------------------- CONECT record -------------------#
-
-                # If the header indicates a CONECT record
-                if header == "CONECT":
-
-                    # Get the record
-                    record = line.lstrip("CONECT")
-
-                    # Split the record into chunks containing the
-                    # serial numbers of the bonded atoms
-                    atoms = \
-                        [int(record[i:i+5]) \
-                         for i in range(0, len(record), 5) \
-                         if record[i:i+5].strip() != ""]
-
-                    # Get the atom the record refers to and the
-                    # atoms bonded to the first atom
-                    atom_record, atoms_bonded = atoms[0], atoms[1:]
-
-                    # If there is no CONECT record for the
-                    # current model yet
-                    if not model in conect_data:
-
-                        # Create the section for the current model
-                        # and add the record
-                        conect_data[model] = \
-                            {atom_record : atoms_bonded}
-
-                    # Otherwise
-                    else:
-
-                        # Just add the record
-                        conect_data[model][atom_record] = atoms_bonded
-
-                #------------------- MODEL record --------------------#
-
-                # If the header contains a model number
-                elif header == "MODEL ":
-
-                    # Get the current model number
-                    model = int(line[10:14])
-
-                    # If there are duplicate models
-                    if model in unique_models:
-
-                        # Raise an error
-                        errstr = \
-                            "Multiple models numbered " \
-                            f"'{model}' were found. Models " \
-                            "must have unique numbers, and " \
-                            "be numbered sequentially in the " \
-                            "PDB file."
-                        raise ValueError(errstr)
-
-                    # Add it to the list of unique models
-                    unique_models.add(model)
-
-                #---------------- ATOM/HETATM record -----------------#
-
-                # If the line contains an ATOM or HETATM record
-                elif header in {"ATOM  ", "HETATM"}:
-
-                    #-------------------- Header ---------------------#
-
-                    # If the record refers to a heteroatom
-                    if header == "HETATM":
-
-                        # Set the heteroatom flag to True
-                        is_hetatm = True
-
-                    # If the record refers to a normal atom
-                    elif header == "ATOM  ":
-
-                        # Set the heteroatom flag to False
-                        is_hetatm = False
-
-                    #-------------------- Serial ---------------------#
-                    
-                    # Get the atom's serial number
-                    serial = int(line[6:11])
-
-                    #------------------- Atom name -------------------#
-
-                    # Get the atom's name
-                    atom_name = line[12:16].strip()
-
-                    #-------------- Alternate location ---------------#
-
-                    # Get the atom's alternate location identifier
-                    alt_loc = line[16]
-
-                    #----------------- Residue name ------------------#
-
-                    # Get the atom's residue name
-                    res_name = line[17:20]
-
-                    #------------------- Chain ID --------------------#
-
-                    # Get the atom's chain identifier
-                    chain_id = line[21]
-
-                    # If no chain identifier is specified
-                    if not chain_id.strip():
-
-                        # Assign an arbitrary chain identifier
-                        # based on the fact that the chain identifier
-                        # is unknown
-                        chain_id = unknown_chain_id
-
-                    #---------------- Residue number -----------------#
-
-                    # Get the atom's residue's position in the sequence
-                    res_seq = int(line[22:26].split()[0])
-
-                    #--------------------- iCODE ---------------------#
-
-                    # Get the atom's residue's insertion code
-                    i_code = line[26]
-
-                    #----------------- Atom position -----------------#
-
-                    # Try to get the atom's position
-                    try:
-
-                        # Get the x coordinate of the atom's position
-                        x = float(line[30:38])
-
-                        # Get the y coordinate of the atom's position
-                        y = float(line[38:46])
-
-                        # Get the z coordinate of the atom's position
-                        z = float(line[46:54])
-
-                    # If something went wrong
-                    except Exception:
-
-                        # Raise an error
-                        errstr = \
-                            f"Missing or invalid value(s) found in " \
-                            f"atom {serial} coordinates " \
-                            f"(line {line_ix})."
-                        raise ValueError(errstr)
-
-                    #---------------- Atom occupancy -----------------#
-
-                    # Try to get the atom's occupancy
-                    try:
-                        
-                        occupancy = float(line[54:60])
-
-                    # If something went wrong
-                    except Exception:
-
-                        # Raise an error
-                        errstr = \
-                            f"Missing or invalid value found " \
-                            f"for atom {serial}'s occupancy " \
-                            f"(line {line_ix})."
-                        raise ValueError(errstr)
-
-                    #------------ Atom temperature factor ------------#
-
-                    # Try to get the atom's temperature factor
-                    # (b-factor)
-                    try:
-                        
-                        temp_factor = float(line[60:66])
-
-                    # If something went wrong
-                    except Exception:
-
-                        # Raise an error
-                        errstr = \
-                            f"Missing or invalid value found " \
-                            f"for atom {serial}'s temperature " \
-                            f"factor (b-factor) (line {line_ix})."
-                        raise ValueError(errstr)
-
-                    #------------------ Segment ID -------------------#
-
-                    # Get the identifier of the segment the atom
-                    # belongs to
-                    seg_id = line[72:76]
-
-                    # If no segment identifier is specified
-                    if not seg_id.strip():
-
-                        # Assign an arbitrary segment identifier
-                        # based on the fact that the segment
-                        # identifier is unknown
-                        seg_id = unknown_seg_id
-
-                    #----------------- Atom element ------------------# 
-
-                    # Get the atom's element's name and convert it
-                    # into all uppercase characters
-                    element = line[76:78].strip(" ").upper()
-
-                    #------------------ Atom charge ------------------#
-
-                    # Try to get the atom's charge
-                    try:
-
-                        charge = line[78:80].strip()
-
-                    # If something went wrong
-                    except Exception:
-
-                        # Raise an error
-                        errstr = \
-                            f"Missing or invalid value found " \
-                            f"for atom {serial}'s charge " \
-                            f"(line {line_ix})."
-                        raise ValueError(errstr)
-
-                    #-------------------- Update ---------------------#
-
-                    # If the model is not yet in the dictionary
-                    if model not in atom_data.keys():
-
-                        # Add it
-                        atom_data[model] = {}
-
-                    # If the chain identifier is not yet in the
-                    # dictionary
-                    if chain_id not in atom_data[model].keys():
-
-                        # Add it
-                        atom_data[model][chain_id] = {}
-
-                    # If the segment identifier is not yet in the
-                    # dictionary
-                    if seg_id not in atom_data[model][chain_id].keys():
-
-                        # Add it
-                        atom_data[model][chain_id][seg_id] = {}
-
-                    # If the residue number is not yet in the
-                    # dictionary
-                    if (res_seq, i_code) not in \
-                        atom_data[model][chain_id][seg_id].keys():
-
-                        # Add it
-                        atom_data[model][chain_id][seg_id][\
-                            (res_seq, i_code)] = \
-                                {"res_name" : res_name, "atoms" : {}}
-                    
-                    # Add the data for the current atom
-                    atom_data[model][chain_id][seg_id][\
-                        (res_seq, i_code)][\
-                        "atoms"][serial] = \
-                            {"atom_name" : atom_name,
-                             "alt_loc" : alt_loc,
-                             "x" : x,
-                             "y" : y,
-                             "z" : z,
-                             "occupancy" : occupancy,
-                             "temp_factor" : temp_factor,
-                             "element" : element,
-                             "charge"  : charge,
-                             "is_hetatm" : is_hetatm}
-
-        # Return the data dictionary and CONECT dictionary
-        # (or None for either, if no coordinates or no CONECT
-        # data were found)
-        return atom_data if atom_data else None, \
-               conect_data if conect_data else None
-
-
-class PDBStructure:
+class Structure:
 
     """
     Class implementing a structure parsed from a PDB file.
@@ -467,8 +59,8 @@ class PDBStructure:
          # Atoms' attributes' level (for instance, 'atom_name')
          "atom_attribute" : 7}
 
-    # A mapping between residues' three-letter name to residues'
-    # one-letter names (canonical residues with histidine
+    # A mapping between residues' three-letter names and residues'
+    # one-letter names (canonical residues + histidine
     # protonation states)
     _RESNAMES_3TO1 = \
         {"ALA" : "A", "CYS" : "C", "ASP" : "D", "GLU" : "E",
@@ -478,6 +70,21 @@ class PDBStructure:
          "THR" : "T", "VAL" : "V", "TRP" : "W", "TYR" : "Y",
          "HIE" : "H", "HID" : "H", "HIP" : "H"}
 
+    # Which residues are considered protein residues
+    _RESNAMES_PROTEIN = \
+        ["ALA", "CYS", "ASP", "GLU",
+         "PHE", "GLY", "HIS", "ILE",
+         "LYS", "LEU", "MET", "ASN",
+         "PRO", "GLN", "ARG", "SER",
+         "THR", "VAL", "TRP", "TYR",
+         "HIE", "HID", "HIP"]
+
+    # Which residues are considered DNA residues
+    _RESNAMES_DNA = ["DA", "DC", "DG", "DT"]
+
+    # Which residues are considered RNA residues
+    _RESNAMES_RNA = ["A", "C", "G", "U"]
+
 
     #------------------------ Initialization -------------------------#
 
@@ -486,32 +93,33 @@ class PDBStructure:
                  atom_data = None,
                  conect_data = None,
                  name = None):
-        """Initialize a ``PDBStructure`` instance.
+        """Initialize a ``Structure`` instance.
 
         Parameters
         ----------
         atom_data : ``dict``, optional
-            A dictionary containing the structure as a nested
-            dictionary of models, chains, segments, residues,
-            and atoms.
+            A nested dictionary containing the structure
 
         conect_data : ``dict``, optional
-            A dictionary containing the CONECT data for the
-            structure.
+            A nested dictionary containing the CONECT data
+            for the structure.
 
         name : ``str``, optional
             The name of the structure.
 
         Notes
         -----
-        To create an empty ``PDBStructure``, leave both ``atom_data``
+        To create an empty ``Structure``, leave both ``atom_data``
         and ``conect_data`` blank.
         """
 
-        # If no atoms' coordinates were provided
+        #---------------- Set the atomic coordinates -----------------#
+
+
+        # If no atomic coordinates were provided
         if atom_data is None:
 
-            # Set the atoms' coordinates to an empty dictionary
+            # Set the atomic coordinates to an empty dictionary
             self._atom_data = {}
 
         # Otherwise
@@ -520,6 +128,10 @@ class PDBStructure:
             # Set the atomic coordinates to the dictionary
             # provided
             self._atom_data = atom_data
+
+
+        #-------------------- Set the CONECT data --------------------#
+
 
         # If no CONECT data were provided
         if conect_data is None:
@@ -544,6 +156,10 @@ class PDBStructure:
             
             # Set the CONECT data to the dictionary provided
             self._conect_data = conect_data
+
+
+        #----------------------- Set the name ------------------------#
+
 
         # Set the name of the structure
         self._name = name
@@ -599,6 +215,52 @@ class PDBStructure:
         """
         
         return self._name
+
+
+    #----------------------- "Dunder" methods ------------------------#
+
+
+    def __eq__(self,
+               other):
+        """Return ``True`` if all attributes of ``self`` are equal
+        to the attributes or ``other`` (the structures' names can be
+        different).
+
+        Parameters
+        ----------
+        other: ``pdbcraft.structure.Structure``
+            Another structure.
+        """
+
+        # If 'other' is not a 'Structure'
+        if not isinstance(other, self.__class__):
+
+            # Raise an error
+            errstr = \
+                "Equality and inequality operations are " \
+                "supported only between " \
+                f"'{self.__class__.__name__}' instances."
+            raise NotImplementedError(errstr)
+
+        # Check the equality
+        return (self.atom_data == other.atom_data \
+                and self.conect_data == other.conect_data)
+
+    def __ne__(self,
+               other):
+        """Return ``True`` if any of the data attributes of ``self``
+        is different from the corresponding attribute of ``other``
+        (the structures' names can be different).
+
+        Parameters
+        ----------
+        other: ``pdbcraft.structure.Structure``
+            Another structure.
+        """
+
+        # Check the inequality
+        return not self.__eq__(other = other)
+
     
 
     #------------------------ Private methods ------------------------#
@@ -611,24 +273,26 @@ class PDBStructure:
         Parameters
         ----------
         mapping : ``dict``
-            A dictionary mapping the old atom numbering with
+            A dictionary mapping the old atom numbering to
             the new atom numbering.
         """
 
-        # If the structure has associated CONECT data
+        # If the structure has any associated CONECT data
         if self.conect_data:
 
-            # Create an empty dictionary to store the new
-            # CONECT data
-            conect_data_new = \
+            # Initialize a dictionary to store the updated CONECT
+            # data, creating an empty dictionary for each model
+            # in the structure
+            conect_data_updated = \
                 {mod : {} for mod in self.conect_data}
 
             # For each model in the CONECT data
             for mod in self.conect_data:
 
                 # For each CONECT record for the current model
-                # (atom the record refers to and the record
-                # itself)
+                # (= the atom the record refers to and the record
+                # itself, containing the atoms bonded to the
+                # first one)
                 for atom_record, record \
                     in self.conect_data[mod].items():
 
@@ -636,7 +300,8 @@ class PDBStructure:
                     # to the new numbering
                     try:
 
-                        atom_record_new = mapping[mod][atom_record]
+                        atom_record_updated = \
+                            mapping[mod][atom_record]
 
                     # If the atom was not found in the mapping
                     # (because, for instance, it was removed
@@ -648,7 +313,7 @@ class PDBStructure:
 
                     # Initialize an empty list to store the new
                     # record
-                    record_new = []
+                    record_updated = []
 
                     # For each atom in the record
                     for atom_bonded in record:
@@ -657,7 +322,7 @@ class PDBStructure:
                         # to the new numbering
                         try:
 
-                            record_new.append(\
+                            record_updated.append(\
                                 mapping[mod][atom_bonded])
 
                         # If the atom was not found (because, for
@@ -671,19 +336,21 @@ class PDBStructure:
                     # length of the old record (= all atoms were added,
                     # meaning that no atoms were missing from the
                     # current record)
-                    if len(record_new) == len(record):
+                    if len(record_updated) == len(record):
 
-                        # Add the record to the new records
-                        conect_data_new[mod][atom_record_new] = \
-                            record_new
+                        # Add the record to the dictionary of
+                        # updated CONECT data
+                        conect_data_updated[mod][\
+                            atom_record_updated] = record_updated
 
-            # Update the CONECT data
-            self._conect_data = conect_data_new
+            # Update the CONECT data for the structure
+            self._conect_data = conect_data_updated
 
 
     def _add_bonds(self,
                    bonds):
-        """Add bonds to the structure's CONECT data.
+        """Add bonds between atoms (it modifies the CONECT data,
+        while the atomic coordinates remain unchanged).
 
         Parameters
         ----------
@@ -720,7 +387,7 @@ class PDBStructure:
 
         # Create a copy of the current CONECT data that will
         # be updated with the new bonds
-        conect_data_new = copy.deepcopy(self.conect_data)
+        conect_data_updated = copy.deepcopy(self.conect_data)
 
         # For each bond (first atom, second atom, and bond type)
         for atom_1, atom_2, bond_type in bonds:
@@ -737,27 +404,27 @@ class PDBStructure:
                 # Get the atom's serial number from its path
                 atom_2 = self._get_atom_serial(path = atom_2)
 
-            # If it is a single bond
+            # If the bond is a single bond
             if bond_type == "single":
 
-                # Create the corresponding new CONECT records
-                # for both atoms
+                # Create the CONECT records representing
+                # the new bond for both atoms
                 new_record_1, new_record_2 = \
                     [atom_2], [atom_1]
 
-            # If it is a double bond
+            # If the bond is a double bond
             elif bond_type == "double":
 
-                # Create the corresponding new CONECT records
-                # for both atoms
+                # Create the CONECT records representing
+                # the new bond for both atoms
                 new_record_1, new_record_2 = \
                     [atom_2, atom_2], [atom_1, atom_1]
 
-            # If it is a triple bond
+            # If the bond is a triple bond
             elif bond_type == "triple":
-
-                # Create the corresponding new CONECT records
-                # for both atoms
+                
+                # Create the CONECT records representing
+                # the new bond for both atoms
                 new_record_1, new_record_2 = \
                     [atom_2, atom_2, atom_2], [atom_1, atom_1, atom_1]
 
@@ -766,11 +433,11 @@ class PDBStructure:
 
                 # If we already have a CONECT record for the
                 # first atom
-                if atom_1 in self.conect_data[mod]:
+                if atom_1 in conect_data_updated[mod]:
 
                     # Update it with the new record
                     record_1 = \
-                        [*self.conect_data[mod][atom_1],
+                        [*conect_data_updated[mod][atom_1],
                          *new_record_1]
 
                 # Otherwise
@@ -781,16 +448,16 @@ class PDBStructure:
 
                 # Update/add the record to the CONECT data,
                 # making sure to sort the atoms in the record
-                # in ascending order
-                conect_data_new[mod][atom_1] = sorted(record_1)
+                # in ascending order of serial number
+                conect_data_updated[mod][atom_1] = sorted(record_1)
 
                 # If we already have a CONECT record for the
                 # second atom
-                if atom_2 in self.conect_data[mod]:
+                if atom_2 in conect_data_updated[mod]:
 
                     # Update it with the new record
                     record_2 = \
-                        [*self.conect_data[mod][atom_2],
+                        [*conect_data_updated[mod][atom_2],
                          *new_record_2]
 
                 # Otherwise
@@ -801,15 +468,20 @@ class PDBStructure:
                 
                 # Update/add the record to the CONECT data,
                 # making sure to sort the atoms in the record
-                # in ascending order
-                conect_data_new[mod][atom_2] = sorted(record_2)
+                # in ascending order of serial number
+                conect_data_updated[mod][atom_2] = sorted(record_2)
 
-            # Sort the atoms in each model so that the CONECT
-            # data are reported in the correct order
-            self._conect_data = \
-                {mod : \
-                    {k : conect_data_new[mod][k] for k  \
-                     in sorted(conect_data_new[mod])}}
+        # Sort the atoms in each model so that the CONECT data
+        # are reported in the correct order (= in ascending
+        # order of the atoms' serial numbers)
+        conect_data_sorted = \
+            {mod : \
+                {k : conect_data_updated[mod][k] for k  \
+                 in sorted(conect_data_updated[mod])} \
+             for mod in conect_data_updated}
+
+        # Update the CONECT data for the structure
+        self._conect_data = conect_data_sorted
 
 
     def _get_atom_serial(self,
@@ -819,8 +491,8 @@ class PDBStructure:
         of the model, chain, segment, and residue the atom
         belongs to, plus the atom's name.
 
-        This method assumes that, in each residue, atoms'
-        names are unique.
+        This method assumes that, within each residue, the
+        atoms' names are unique.
 
         Parameters
         ----------
@@ -848,18 +520,22 @@ class PDBStructure:
             # we are looking for
             if sub_struct[atom]["atom_name"] == atom_name:
                 
-                # Return the atom's serial number
+                # Return the atom's serial number (there is no
+                # need to check any further because we are
+                # assuming that, for each residue, the atoms'
+                # names are unique)
                 return atom
 
 
     def _get_last(self,
                   items_type):
-        """Get the last item of a specfic type in the structure.
+        """Get the last item of a specfic type in the structure
+        by recursively traversing the 'atom_data' dictionary.
 
         Parameters
         ----------
         items_type : ``str``
-            The type of the items to get the last of (model, chain,
+            The type of items to get the last of (model, chain,
             segment, residue, or atom).
 
         Returns
@@ -886,7 +562,8 @@ class PDBStructure:
             # If the current depth is the target depth
             if current_depth == target_depth:
 
-                # Return the last key found in the sub-structure
+                # Return the last (= highest) key found in
+                # the sub-structure
                 return max(struct.keys(),
                            default = None)
 
@@ -911,7 +588,7 @@ class PDBStructure:
                     if last_item is None \
                     or last_in_sub_struct > last_item:
                         
-                        # Update the last item
+                        # Update the last item with the current one
                         last_item = last_in_sub_struct
 
             # Return the last item
@@ -921,29 +598,31 @@ class PDBStructure:
         #--------------------- Get the last item ---------------------#
 
 
-        # Get the depth corresponding to the where the items we want
+        # Get the depth corresponding to where the items we want
         # to take the last of are stored in the structure
         target_depth = self._ITEM2DEPTH[items_type]
 
-        # Find the last item of the specified type
+        # Find the last item of the specified type (we can pass the
+        # 'atom_data' attribute directly because it will not be
+        # modified by the recursion)
         return recursive_step(struct = self.atom_data,
                               target_depth = target_depth)
 
 
     def _merge(self,
                other):
-        """Merge two ``PDBStructure`` instances and return
-        a new ``PDBStructure``.
+        """Merge two ``Structure`` instances and return
+        a new ``Structure``.
 
         Parameters
         ----------
-        other : ``pdbcraft.PDBStructure``
-            The ``PDBStructure`` to be merged with the current one.
+        other : ``pdbcraft.structure.Structure``
+            The ``Structure`` to be merged with the current one.
 
         Returns
         -------
-        merged : ``pdbcraft.PDBStructure``
-            The merged ``PDBStructure``.
+        merged : ``pdbcraft.structure.Structure``
+            The merged ``Structure``.
         """
 
 
@@ -972,15 +651,18 @@ class PDBStructure:
                 # If the key is already in the merged structure
                 if key in merged:
 
-                    # Merge the values
+                    # Add the values found associated with the same
+                    # key in the 'other' sub-structure
                     merged[key] = \
                         recursive_step(struct = merged[key],
                                        other_struct = sub_struct)
                 
-                # Otherwise (= the key is only in the other structure)
+                # Otherwise (= the key is only in the 'other'
+                # sub-structure)
                 else:
 
-                    # Add it to the merged structure
+                    # Add the entire sub-structure the key is
+                    # associated with to the merged structure
                     merged[key] = sub_struct
 
             # Return the merged structure
@@ -990,6 +672,14 @@ class PDBStructure:
         #------------------- Merge the structures --------------------#
 
 
+        # If 'other' is not a Structure
+        if not isinstance(other, self.__class__):
+
+            # Raise an error
+            errstr = \
+                "'other' must be a Structure instance."
+            raise TypeError(errstr)
+
         # If the two structures do not have the same number
         # of models
         if len(self.atom_data) != len(other.atom_data):
@@ -997,14 +687,15 @@ class PDBStructure:
             # Raise an error
             errstr = \
                 "The current structure and 'other' do not " \
-                "have the same number of models."
+                "have the same number of models. Therefore, " \
+                "they cannot be merged."
             raise ValueError(errstr)
 
         # Get the serial number of the last atom in the current
         # structure
         last_atom = self._get_last(items_type = "atom")
 
-        # Renumber the atoms in the other structure starting
+        # Renumber the atoms in the 'other' structure starting
         # from the last atom in the current structure
         other._renumber_atoms(start = last_atom)
 
@@ -1019,8 +710,9 @@ class PDBStructure:
                            other_struct = other.conect_data)
 
         # Create the merged structure
-        merged = PDBStructure(atom_data = merged_atom_data,
-                              conect_data = merged_conect_data)
+        merged = \
+            self.__class__(atom_data = merged_atom_data,
+                           conect_data = merged_conect_data)
 
         # Renumber the atoms of the merged structure starting
         # from 1
@@ -1031,6 +723,7 @@ class PDBStructure:
 
 
     def _relabel(self,
+                 action,
                  item,
                  mapping = None,
                  start = None,
@@ -1040,10 +733,15 @@ class PDBStructure:
                  segments = None,
                  residues = None,
                  residues_types = None):
-        """Re-label models, chains, segments, or residues.
+        """Re-label models, chains, segments, residues, or atoms,
+        or assigm a new value to one of their attributes.
 
         Parameters
         ----------
+        action : ``str``, {``"renumber"``, ``"rename"``}
+            The re-labeling action performed (either renumbering
+            or renaming).
+
         item : ``str``
             The type of item to be re-labeled.
 
@@ -1051,12 +749,11 @@ class PDBStructure:
             A dictionary mapping the old labels to the new labels.
 
         start : ``int``, optional
-            The new starting number (for models and residues), whose
-            IDs are either integers (for models) or contain integers
-            (for residues).
+            The new starting number for items whose IDs are either
+            integers (models) or contain integers (residues).
 
         attribute : ``str``, optional
-            The name of the attribute that should be renamed.
+            The name of the attribute that should be relabeled.
 
         models : ``list``, optional
             A list of the models whose items will be affected by
@@ -1098,7 +795,7 @@ class PDBStructure:
             # If we are at the target depth
             if current_depth == target_depth:
 
-                # If we are substituting/assigning a specific
+                # If we are assigning a new value to a specific
                 # attribute
                 if attribute is not None:
 
@@ -1111,8 +808,7 @@ class PDBStructure:
 
                         # Substitute the value with the corresponding
                         # one found in the mapping
-                        struct[attribute] = \
-                            mapping[struct[attribute]]
+                        struct[attribute] = mapping[value]
 
                     # Return the current sub-structure
                     return struct
@@ -1124,9 +820,10 @@ class PDBStructure:
                     # If a starting number was passed
                     if start is not None:
                     
-                        # Renumber the keys in this dictionary.
-                        # Take care of tuple keys (= residues)
-                        # as well
+                        # Renumber the keys in the current
+                        # sub-structure, taking care of the
+                        # identifiers that are tuples
+                        # (= residue idenfitiers)
                         return {((i, old_key[1]) \
                                   if isinstance(old_key, tuple) \
                                   else i) : struct[old_key]  \
@@ -1178,6 +875,11 @@ class PDBStructure:
                             # to the updated struture
                             new_struct[new_key] = struct[old_key]
 
+                        # Sort the updated structure
+                        new_struct = \
+                            {key : new_struct[key] for key in \
+                             sorted(new_struct)}
+
                         # Return the updated structure
                         return new_struct  
 
@@ -1187,38 +889,42 @@ class PDBStructure:
             for key, sub_struct in struct.items():
 
                 # Set the flag to decide whether we should
-                # recurse to True (by default, recurse)
+                # recurse to True (= by default, recurse)
                 should_recurse = True
                 
-                # If a set of models was specified, we have
-                # reached the models' level, and we are not
-                # at any of the selected models
+                # If:
+                # - a list of models was specified
+                # - AND we have reached the models' level
+                # - AND we are not at any of the selected models
                 if models is not None and current_depth == 1 \
                 and key not in models:
 
                     # Do not recurse
                     should_recurse = False
                 
-                # If a set of chains was specified, we have
-                # reached the chains' level, and we are not
-                # at any of the selected chains
+                # If:
+                # - a list of chains was specified
+                # - AND we have reached the chains' level
+                # - AND we are not at any of the selected chains
                 if chains is not None and current_depth == 2 \
                 and key not in chains:
 
                     # Do not recurse
                     should_recurse = False
                 
-                # If a set of segments was specified, we have
-                # reached the segments' level, and we are not
-                # at any of the selected segments
+                # If:
+                # - a set of segments was specified
+                # - AND we have reached the segments' level
+                # - AND we are not at any of the selected segments
                 if segments is not None and current_depth == 3 \
                 and key not in segments:
 
                     # Do not recurse
                     should_recurse = False
                 
-                # If a set of residue was specified, and we have
-                # reached the residues' level
+                # If:
+                # - a list of residue was specified
+                # - AND and we have reached the residues' level
                 if residues is not None and current_depth == 4:
 
                     # If neither the full residue ID (sequence
@@ -1230,9 +936,12 @@ class PDBStructure:
                         # Do not recurse
                         should_recurse = False
                 
-                # If a list of residue types was specified, we have
-                # reached the inner residue level, and the current
-                # residue is not of a type of interest
+                # If:
+                # - a list of residue types was specified
+                # - AND we have reached the inner residues'
+                #   attributes' level
+                # - AND and the current residue is not of a type
+                #   of interest
                 if residues_types is not None and current_depth == 5 \
                 and struct["res_name"] in residues_types:
 
@@ -1286,7 +995,7 @@ class PDBStructure:
                 errstr = "'start' must be an integer."
                 raise TypeError(errstr)
 
-            # if a starting number was specified for something
+            # If a starting number was specified for something
             # other than models or residues
             if item not in ("model", "residue"):
 
@@ -1306,14 +1015,33 @@ class PDBStructure:
                 errstr = "'mapping' must be a dictionary."
                 raise TypeError(errstr)
 
+            # If we are renumbering with the mapping
+            if action == "renumber":
+
+                # Get the values in the mapping as a list and
+                # as a set
+                values = list(mapping.values())
+                values_set = set(mapping.values())
+
+                # If they are not unique
+                if len(values_set) < len(values):
+
+                    # Raise an error
+                    errstr = \
+                        "When renumbering, both keys and values " \
+                        "in 'mapping' must be unique."
+                    raise ValueError(errstr)
+
 
         #------------------------- Re-label --------------------------#
 
 
-        # Get the target depth from the item to be re-labeled
+        # Get the target depth from the type of items to be re-labeled
         target_depth = self._ITEM2DEPTH[item]
 
-        # Use the recursion
+        # Recurse and update the structure's atomic coordinates
+        # (we need to pass a copy of the 'atom_data' dictionary
+        # beecause it will be modified by the recursion)
         self._atom_data = \
             recursive_step(struct = copy.deepcopy(self.atom_data),
                            target_depth = target_depth,
@@ -1332,12 +1060,13 @@ class PDBStructure:
         """Renumber the atoms in the structure so that each model's
         atom numbering starts from 'start', and each chain's atom
         numbering starts from the number of the atom ending the
-        previous chains plus 2 (to accommodate TER records).
+        previous chains plus 2 (to accommodate the TER record at
+        the end of a chain).
 
         Parameters
         ----------
         start : ``int``, ``1``
-            The new starting number for the atoms' serials.
+            The new starting number for the atoms' serial numbers.
         """
 
 
@@ -1351,10 +1080,12 @@ class PDBStructure:
                            oldnum2newnum = None):
 
             # If no mapping has been created yet between the
-            # old numbering and the new numbering (this
+            # old numbering and the new numbering, create an
+            # empty dictionary that will contain the mapping (this
             # mapping will be created only once when we are
             # traversing the dictionary representing the first
-            # model and then updated)
+            # model, and then updated, since the mapping will
+            # be None only at the very beginning)
             if oldnum2newnum is None:
 
                 # Create a mapping that will contain, for each
@@ -1424,7 +1155,7 @@ class PDBStructure:
                             # Carry over the previous count plus 1
                             current_atom_count += 1
 
-                        # Recursively process the subdictionary
+                        # Recursively process the sub-structure
                         struct[key], current_atom_count, oldnum2newnum = \
                             recursive_step(\
                                 struct = sub_struct,
@@ -1443,13 +1174,15 @@ class PDBStructure:
 
 
         # Get the updated data for the atoms and the mapping
-        # between the old numbering and the new numbering
-        updated_atom_data, _, oldnum2newnum = \
+        # between the old numbering and the new numbering (we need
+        # to pass a copy of the 'atom_data' dictionary because it
+        # will be modified by the recursion)
+        atom_data_updated, _, oldnum2newnum = \
             recursive_step(struct = copy.deepcopy(self.atom_data),
                            current_atom_count = start - 2)
 
         # Update the data for the atoms
-        self._atom_data = updated_atom_data
+        self._atom_data = atom_data_updated
 
 
         #-------------------- Update CONECT data ---------------------#
@@ -1475,7 +1208,7 @@ class PDBStructure:
             Whether to keep or remove the selected items.
 
         items : ``list``
-            A list of items.
+            The list of items to be kept/removed.
 
         items_type : ``str``
             The type of items to be kept/removed.
@@ -1522,7 +1255,7 @@ class PDBStructure:
             # If we are at the target depth
             if current_depth == target_depth:
 
-                # If we have to keep the selected items
+                # If we have to keep only the selected items
                 if action == "keep":
 
                     # Return the current sub-structure with the
@@ -1624,7 +1357,9 @@ class PDBStructure:
         # be kept or removed
         target_depth = self._ITEM2DEPTH[items_type]
 
-        # Keep or remove the items
+        # Keep or remove the items (we need to pass a copy of the
+        # 'atom_data' attribute because it will be modified by the
+        # recursion)
         self._atom_data = \
             recursive_step(struct = copy.deepcopy(self.atom_data),
                            action = action,
@@ -1636,12 +1371,20 @@ class PDBStructure:
                            residues = residues)
 
 
+        #-------------------- Renumber the atoms ---------------------#
+
+
+        # Renumber the atoms (it also updates the CONECT data)
+        self._renumber_atoms()
+
+
     def _move_atoms(self,
                     atoms,
                     create_new_struct,
                     new_chain,
                     new_segment,
-                    new_residue):
+                    new_residue,
+                    in_place):
         """Move atoms to another part of the structure or to a new
         structure.
 
@@ -1666,10 +1409,14 @@ class PDBStructure:
             The identifier of the residue where the atoms should
             be moved.
 
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
         Returns
         -------
-        The method returns a new ``pdbcraft.PDBStructure`` if
-        ``create_new_struct = True``. Otherwise, it returns ``None``.
+        ``pdbcraft.structure.Structure`` if ``in_place = False``,
+        ``None`` otherwise.
         """
 
 
@@ -1845,10 +1592,10 @@ class PDBStructure:
 
 
         # If we need to add the atoms to a new structure
-        if create_new_struct:
+        if not in_place:
 
             # Create an empty structure
-            new_struct = PDBStructure()
+            new_struct = Structure()
 
             # Move the atoms from one structure to the other
             recursive_step(\
@@ -2079,7 +1826,8 @@ class PDBStructure:
         #---------------------- Sort the atoms -----------------------#
 
 
-        # Sort the atoms
+        # Sort the atoms (we need to pass a copy of the 'atom_data'
+        # attribute because it will be modified)
         self._atom_data = \
             recursive_step(\
                 struct = copy.deepcopy(self.atom_data),
@@ -2088,11 +1836,36 @@ class PDBStructure:
                 other_atoms_position = other_atoms_position)
 
 
+        #-------------------- Renumber the atoms ---------------------#
+
+
+        # Renumber the atoms (it also updates the CONECT data)
+        self._renumber_atoms()
+
+
+    #----------------------------- Copy ------------------------------#
+
+
+    def get_copy(self):
+        """Return a copy of the current structure.
+
+        Returns
+        -------
+        ``struct_copy`` : ``pdbcraft.structure.Structure``
+            A copy of the current structure.
+        """
+        
+        return Structure(atom_data = copy.deepcopy(self.atom_data),
+                         conect_data = copy.deepcopy(self.conect_data),
+                         name = copy.deepcopy(self.name))
+
+
     #---------------------- Update CONECT data -----------------------#
 
 
     def add_bonds(self,
-                  bonds):
+                  bonds,
+                  in_place = False):
         """Add bonds between pairs of atoms. This updates the
         CONECT data associated with the structure.
 
@@ -2127,26 +1900,37 @@ class PDBStructure:
             if we have already specified a bond between atom 1 and
             atom 2) since, for each bond specified, the CONECT records
             for both atoms involved in the bond will be updated.
-        """
 
-        # Add the bonds to the structure
-        self._add_bonds(bonds = bonds)
-
-
-    #----------------------------- Copy ------------------------------#
-
-
-    def copy(self):
-        """Return a copy of the current structure.
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
 
         Returns
         -------
-        ``struct_copy`` : ``pdbcraft.PDBStructure``
-            A copy of the current structure.
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Return a deep copy of the instance
-        return copy.deepcopy(self)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = {"bonds" : bonds}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Add the bonds to the structure
+            self._add_bonds(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Add the bonds to the new structure
+            struct_new.add_bonds(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #----------------------------- Merge -----------------------------#
@@ -2154,17 +1938,17 @@ class PDBStructure:
 
     def merge(self,
               other):
-        """Merge the current structure with another ``PDBStructure``,
+        """Merge the current structure with another ``Structure``,
         and return the merged structure.
 
         Parameters
         ----------
-        other : ``pdbcraft.PDBStructure``
-            The other ``PDBStructure``.
+        other : ``pdbcraft.structure.Structure``
+            The other structure.
 
         Returns
         -------
-        merged : ``pdbcraft.PDBStructure``
+        merged : ``pdbcraft.structure.Structure``
             The merged structure.
         """
 
@@ -2178,7 +1962,8 @@ class PDBStructure:
     def renumber_models(self,
                         mapping = None,
                         start = None,
-                        models = None):
+                        models = None,
+                        in_place = False):
         """Renumber models in the structure.
 
         You can either provide a dictionary mapping the old
@@ -2201,17 +1986,48 @@ class PDBStructure:
             A list, tuple, or set of models to be
             renumbered. If not provided, all models
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Renumber the models
-        self._relabel(item = "model",
-                      mapping = mapping,
-                      start = start)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "renumber",
+             "item" : "model",
+             "mapping" : "mapping",
+             "start" : "start",
+             "models" : models}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Renumber the models
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Renumber the models in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def rename_chains(self,
                       mapping,
-                      models = None):
+                      models = None,
+                      in_place = False):
         """Rename chains in the structure.
 
         You must provide a dictionary mapping the old
@@ -2232,18 +2048,48 @@ class PDBStructure:
             A list, tuple, or set of models whose chains
             will be renamed. If not provided, all models
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Rename the chains
-        self._relabel(item = "chain",
-                      mapping = mapping,
-                      models = models)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "rename",
+             "item" : "chain",
+             "mapping" : mapping,
+             "models" : models}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Rename the chains
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Rename the chains in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def rename_segments(self,
                         mapping,
                         models = None,
-                        chains = None):
+                        chains = None,
+                        in_place = False):
         """Rename the segments in the structure.
 
         You must provide a dictionary mapping the old
@@ -2270,13 +2116,42 @@ class PDBStructure:
             A list, tuple, or set of chains whose segments
             will be renamed. If not provided, all chains
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Rename the segments
-        self._relabel(item = "segment",
-                      mapping = mapping,
-                      models = models,
-                      chains = chains)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "rename",
+             "item" : "segment",
+             "mapping" : mapping,
+             "models" : models,
+             "chains" : chains}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Rename the segments
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Rename the segments in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def renumber_residues(self,
@@ -2284,7 +2159,8 @@ class PDBStructure:
                           start = None,
                           models = None,
                           chains = None,
-                          segments = None):
+                          segments = None,
+                          in_place = False):
         """Renumber residues in the structure.
 
         You can either provide a dictionary mapping the old
@@ -2323,22 +2199,52 @@ class PDBStructure:
             A list, tuple, or set of segments whose residues
             will be renumbered. If not provided, all segments
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Renumber the residues
-        self._relabel(item = "residue",
-                      mapping = mapping,
-                      start = start,
-                      models = models,
-                      chains = chains,
-                      segments = segments)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "renumber",
+             "item" : "residue",
+             "mapping" : mapping,
+             "start" : start,
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Renumber the residues
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Renumber the residues in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def rename_residues(self,
                         mapping,
                         models = None,
                         chains = None,
-                        segments = None):
+                        segments = None,
+                        in_place = False):
         """Change the names (type) of residues.
 
         You must provide a dictionary mapping the
@@ -2365,15 +2271,44 @@ class PDBStructure:
             A list, tuple, or set of segments whose residues
             will be renamed. If not provided, all segments
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Rename the residues
-        self._relabel(item = "residue_attribute",
-                      mapping = mapping,
-                      attribute = "res_name",
-                      models = models,
-                      chains = chains,
-                      segments = segments)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "rename",
+             "item" : "residue_attribute",
+             "mapping" : mapping,
+             "attribute" : "res_name",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Rename the residues
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Rename the residues in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def rename_atoms(self,
@@ -2382,7 +2317,8 @@ class PDBStructure:
                      chains = None,
                      segments = None,
                      residues = None,
-                     residues_types = None):
+                     residues_types = None,
+                     in_place = False):
         """Change the names of atoms. The atoms' types
         remain invaried. This is useful especially to
         convert between nomenclatures for hydrogens
@@ -2424,36 +2360,94 @@ class PDBStructure:
             A list, tuple, or set of residue types whose atoms
             will be renamed. If not provided, residues of all
             types will be considered.
-        """ 
 
-        # Rename the atoms
-        self._relabel(item = "atom_attribute",
-                      mapping = mapping,
-                      attribute = "atom_name",
-                      models = models,
-                      chains = chains,
-                      segments = segments,
-                      residues = residues,
-                      residues_types = residues_types)
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "rename",
+             "item" : "atom_attribute",
+             "mapping" : mapping,
+             "attribute" : "atom_name",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments,
+             "residues" : residues,
+             "residues_types" : residues_types}
+
+        # If the structure needs to be modified in place
+        if in_place:
+
+            # Rename the atoms
+            self._relabel(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Rename the atoms in the new structure
+            struct_new._relabel(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #-------------------------- Keep items ---------------------------#
 
 
     def keep_models(self,
-                    models):
+                    models,
+                    in_place = False):
         """Keep only selected models.
 
         Parameters
         ----------
         models : ``list``
             The models to be kept.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Keep only the selected models
-        self._keep_or_remove(action = "keep",
-                             items = models,
-                             items_type = "model")
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : models,
+             "items_type" : "model"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected models
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected models in the new structure
+            self._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
         # There is no need to renumber the atoms since
         # the atom numbering re-starts for each model
@@ -2461,7 +2455,8 @@ class PDBStructure:
 
     def keep_chains(self,
                     chains,
-                    models = None):
+                    models = None,
+                    in_place = False):
         """Keep only selected chains.
 
         Parameters
@@ -2479,22 +2474,48 @@ class PDBStructure:
 
             If no ``models`` are provided, all models
             will be considered.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Keep only the selected chains
-        self._keep_or_remove(action = "keep",
-                             items = chains,
-                             items_type = "chain",
-                             models = models)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : chains,
+             "items_type" : "chain",
+             "models" : models}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected chains
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected chains in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def keep_segments(self,
                       segments,
                       models = None,
-                      chains = None):
+                      chains = None,
+                      in_place = False):
         """Keep only selected segments.
 
         Parameters
@@ -2523,17 +2544,42 @@ class PDBStructure:
 
             If no ``chains`` are provided, all chains
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Keep only the selected segments
-        self._keep_or_remove(action = "keep",
-                             items = segments,
-                             items_type = "chain",
-                             models = models,
-                             chains = chains)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : segments,
+             "items_type" : "segment",
+             "models" : models,
+             "chains" : chains}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected segments
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected segments in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def keep_residues(self,
@@ -2595,18 +2641,43 @@ class PDBStructure:
 
             If no ``segments`` are provided, all segments
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Keep only the selected residues
-        self._keep_or_remove(action = "keep",
-                             items = residues,
-                             items_type = "chain",
-                             models = models,
-                             chains = chains,
-                             segments = segments)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : residues,
+             "items_type" : "residue",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def keep_atoms(self,
@@ -2614,7 +2685,8 @@ class PDBStructure:
                    models = None,
                    chains = None,
                    segments = None,
-                   residues = None):
+                   residues = None,
+                   in_place = False):
         """Keep only selected atoms.
 
         Parameters
@@ -2673,37 +2745,257 @@ class PDBStructure:
 
             If no ``residues`` are provided, all residues
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Keep only the selected atoms
-        self._keep_or_remove(action = "keep",
-                             items = residues,
-                             items_type = "chain",
-                             models = models,
-                             chains = chains,
-                             segments = segments)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : atoms,
+             "items_type" : "atom",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments,
+             "residues" : residues}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected atoms
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected atoms in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def keep_protein(self,
+                     extra_protein_residues = None,
+                     in_place = False):
+        """Keep only protein residues.
+
+        Parameters
+        ----------
+        extra_protein_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered protein residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of protein residues
+        protein_residues = self._RESNAMES_PROTEIN
+
+        # If a list of extra residues was passed
+        if extra_protein_residues is not None:
+
+            # Add the residues to the set
+            protein_residues.extend(extra_protein_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : protein_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def keep_dna(self,
+                 extra_dna_residues = None,
+                 in_place = False):
+        """Keep only DNA residues.
+
+        Parameters
+        ----------
+        extra_dna_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered DNA residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of DNA residues
+        dna_residues = self._RESNAMES_DNA
+
+        # If a list of extra residues was passed
+        if extra_dna_residues is not None:
+
+            # Add the residues to the set
+            dna_residues.extend(extra_dna_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : dna_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def keep_rna(self,
+                 extra_rna_residues = None,
+                 in_place = False):
+        """Keep only RNA residues.
+
+        Parameters
+        ----------
+        extra_rna_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered RNA residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of RNA residues
+        rna_residues = self._RESNAMES_RNA
+
+        # If a list of extra residues was passed
+        if extra_rna_residues is not None:
+
+            # Add the residues to the set
+            rna_residues.extend(extra_rna_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "keep",
+             "items" : rna_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #------------------------- Remove items --------------------------#
 
 
     def remove_models(self,
-                      models):
+                      models,
+                      in_place = False):
         """Remove selected models.
 
         Parameters
         ----------
         models : ``list``
             The models to be removed.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Remove the models
-        self._keep_or_remove(action = "remove",
-                             items = models,
-                             items_type = "model")
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : models,
+             "items_type" : "model"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected models
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected models in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
         # There is no need to renumber the atoms since
         # the atom numbering re-starts for each model
@@ -2711,7 +3003,8 @@ class PDBStructure:
 
     def remove_chains(self,
                       chains,
-                      models = None):
+                      models = None,
+                      in_place = False):
         """Remove selected models.
 
         Parameters
@@ -2729,22 +3022,48 @@ class PDBStructure:
 
             If no ``models`` are provided, all models
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Remove the chains
-        self._keep_or_remove(action = "remove",
-                             items = chains,
-                             items_type = "chain",
-                             models = models)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : chains,
+             "items_type" : "chain",
+             "models" : models}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected chains
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected chains in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def remove_segments(self,
                         segments,
                         models = None,
-                        chains = None):
+                        chains = None,
+                        in_place = False):
         """Remove segments from the structure.
 
         Parameters
@@ -2773,24 +3092,50 @@ class PDBStructure:
 
             If no ``chains`` are provided, all chains
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Remove the segments
-        self._keep_or_remove(action = "remove",
-                             items = segments,
-                             items_type = "segment",
-                             models = models,
-                             chains = chains)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : segments,
+             "items_type" : "segment",
+             "models" : models,
+             "chains" : chains}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected segments
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected segments in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def remove_residues(self,
                         residues,
                         models = None,
                         chains = None,
-                        segments = None):
+                        segments = None,
+                        in_place = False):
         """Remove residues from the structure.
 
         Parameters
@@ -2845,18 +3190,43 @@ class PDBStructure:
 
             If no ``segments`` are provided, all segments
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Remove the residues
-        self._keep_or_remove(action = "remove",
-                             items = residues,
-                             items_type = "residue",
-                             models = models,
-                             chains = chains,
-                             segments = segments)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : residues,
+             "items_type" : "residue",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     def remove_atoms(self,
@@ -2864,7 +3234,8 @@ class PDBStructure:
                      models = None,
                      chains = None,
                      segments = None,
-                     residues = None):
+                     residues = None,
+                     in_place = False):
         """Remove atoms from the structure.
 
         Parameters
@@ -2923,19 +3294,209 @@ class PDBStructure:
 
             If no ``residues`` are provided, all residues
             will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Remove the atoms
-        self._keep_or_remove(action = "remove",
-                             items = atoms,
-                             items_type = "atom",
-                             models = models,
-                             chains = chains,
-                             segments = segments,
-                             residues = residues)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : atoms,
+             "items_type" : "atom",
+             "models" : models,
+             "chains" : chains,
+             "segments" : segments,
+             "residues" : residues}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected atoms
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected atoms in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def remove_protein(self,
+                       extra_protein_residues = None,
+                       in_place = False):
+        """Remove protein residues.
+
+        Parameters
+        ----------
+        extra_protein_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered protein residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of protein residues
+        protein_residues = self._RESNAMES_PROTEIN
+
+        # If a list of extra residues was passed
+        if extra_protein_residues is not None:
+
+            # Add the residues to the set
+            protein_residues.extend(extra_protein_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : protein_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def remove_dna(self,
+                   extra_dna_residues = None,
+                   in_place = False):
+        """Remove DNA residues.
+
+        Parameters
+        ----------
+        extra_dna_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered DNA residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of DNA residues
+        dna_residues = self._RESNAMES_DNA
+
+        # If a list of extra residues was passed
+        if extra_dna_residues is not None:
+
+            # Add the residues to the set
+            dna_residues.extend(extra_dna_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : dna_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def remove_rna(self,
+                   extra_rna_residues = None,
+                   in_place = False):
+        """Remove RNA residues.
+
+        Parameters
+        ----------
+        extra_rna_residues : ``list``, optional
+            A list of residues that are not part of the canonical
+            set but need to be considered RNA residues.
+        
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
+        """
+
+        # Get the canonical set of RNA residues
+        rna_residues = self._RESNAMES_RNA
+
+        # If a list of extra residues was passed
+        if extra_rna_residues is not None:
+
+            # Add the residues to the set
+            rna_residues.extend(extra_rna_residues)
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "remove",
+             "items" : rna_residues,
+             "items_type" : "residue"}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Remove the selected residues
+            self._keep_or_remove(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Remove the selected residues in the new structure
+            struct_new._keep_or_remove(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #-------------------------- Move atoms ---------------------------#
@@ -2943,10 +3504,10 @@ class PDBStructure:
 
     def move_atoms(self,
                    atoms,
-                   create_new_struct = False,
                    new_chain = None,
                    new_segment = None,
-                   new_residue = None):
+                   new_residue = None,
+                   in_place = False):
         """Move a set of atoms to another (possibly new) chain,
         segment, and/or residue.
 
@@ -2955,10 +3516,6 @@ class PDBStructure:
         atoms : ``list``
             A list containing the serial numbers of the atoms
             to be moved.
-
-        create_new_struct : ``bool``, ``False``
-            Whether to create a new structure to move the atoms
-            to.
 
         new_chain : ``str``, optional
             The identifier of a new chain to move the atoms to.
@@ -2980,19 +3537,23 @@ class PDBStructure:
             If no residue is passed, the atoms are kept on
             the same residue they were before.
 
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
         Returns
         -------
-        If ``create_new_struct = True``, a new ``PDBStructure``
-        will be returned. Otherwise, ``None`` will be
-        returned.
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
         # Move the atoms
         return self._move_atoms(atoms = atoms,
-                                create_new_struct = create_new_struct,
+                                create_new_struct = not in_place,
                                 new_chain = new_chain,
                                 new_segment = new_segment,
-                                new_residue = new_residue)
+                                new_residue = new_residue,
+                                in_place = in_place)
 
 
     #-------------------------- Sort atoms ---------------------------#
@@ -3001,7 +3562,8 @@ class PDBStructure:
     def sort_atoms_residue_name(self,
                                 atoms_names,
                                 residue_name,
-                                other_atoms_position = "after"):
+                                other_atoms_position = "after",
+                                in_place = False):
         """Sort the atoms of all residues having a specific name
         according to a list of atoms' names.
 
@@ -3029,16 +3591,40 @@ class PDBStructure:
             atoms are sorted, the atoms whose names do not
             match those provided in ``atoms_names`` will
             be placed after the sorted atoms.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
+        otherwise
         """
 
-        # Sort the atoms
-        self._sort_atoms_residue_name(\
-            atoms_names = atoms_names,
-            residue_name = residue_name,
-            other_atoms_position = other_atoms_position)
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"atoms_names" : atoms_names,
+             "residue_name" : residue_name,
+             "other_atoms_position" : other_atoms_position}
 
-        # Renumber the atoms (it also updates the CONECT data)
-        self._renumber_atoms()
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Sort the atoms
+            self._sort_atoms_residue_name(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Sort the atoms in the new structure
+            struct_new._sort_atoms_residue_name(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #-------------------------- Write files --------------------------#
@@ -3084,7 +3670,7 @@ class PDBStructure:
             "{:>2s}{:2s}\n"
 
         # Get the format string for MODEL records
-        fmt_model = "MODEL{:5}     \n"
+        fmt_model = "MODEL     {:>4}\n"
 
         # Get the format string for TER records
         fmt_ter = "TER   {:5d}      {:3s} {:1s}{:4d}\n"
@@ -3130,7 +3716,7 @@ class PDBStructure:
                                 "multiple models in the structure."
                             logger.warning(warnstr)
 
-                        # Write the records out anyway
+                        # Write out the records anyway
                         out.write(fmt_model.format(mod))
 
                 # For each chain and associated data

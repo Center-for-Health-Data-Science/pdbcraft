@@ -22,5 +22,9 @@
 #    License along with this program. 
 #    If not, see <http://www.gnu.org/licenses/>.
 
-# Import everything from the 'utils' module
-from .utils import *
+
+# Import everything from the 'parsers' module
+from .parsers import *
+
+# Import everything from the 'structure' module
+from .structure import *
