@@ -1332,19 +1332,53 @@ class Structure:
                     # or residue are met
                     if is_right_model or is_right_chain \
                         or is_right_segment or is_right_residue:
-                        
-                        # Recurse through the sub-structure
-                        struct[key] = \
-                            recursive_step(\
-                                struct = sub_struct,
-                                action = action,
-                                items = items,
-                                target_depth = target_depth,
-                                models = models,
-                                chains = chains,
-                                segments = segments,
-                                residues = residues,
-                                current_depth = current_depth + 1)
+
+                        # If we are at the residues' level
+                        if current_depth == 4:
+
+                            # Let's skip the residues' attributes'
+                            # level at the next recursion
+                            struct[key]["atoms"] = \
+                                recursive_step(\
+                                    struct = sub_struct["atoms"],
+                                    action = action,
+                                    items = items,
+                                    target_depth = target_depth,
+                                    models = models,
+                                    chains = chains,
+                                    segments = segments,
+                                    residues = residues,
+                                    current_depth = current_depth + 2)
+
+                            # If the residue is empty after having
+                            # removed the atoms
+                            if not struct[key]["atoms"]:
+
+                                # Remove the residue
+                                struct.pop(key)
+
+                        # Otherwise
+                        else:
+
+                            # Let's go to the level right below
+                            struct[key] = \
+                                recursive_step(\
+                                    struct = sub_struct,
+                                    action = action,
+                                    items = items,
+                                    target_depth = target_depth,
+                                    models = models,
+                                    chains = chains,
+                                    segments = segments,
+                                    residues = residues,
+                                    current_depth = current_depth + 1)
+
+                            # If the container is empty after having
+                            # removed the items
+                            if not struct[key]:
+
+                                # Remove the container
+                                struct.pop(key)
 
             # Return the updated structure
             return struct
@@ -3317,7 +3351,7 @@ class Structure:
 
         # If the structure needs to be modified in place
         if in_place:
-            
+
             # Remove the selected atoms
             self._keep_or_remove(**kwargs)
 
