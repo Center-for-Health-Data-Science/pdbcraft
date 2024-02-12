@@ -26,9 +26,12 @@
 # Standard libaray
 import collections
 import copy
+import itertools
 import logging as log
 import os
 import re
+# pdbcraft
+from . import _defaults
 
 
 # Get the module's logger
@@ -41,49 +44,32 @@ class Structure:
     Class implementing a structure parsed from a PDB file.
     """
 
-    # At what depth in the 'atom_data' dictionary different
-    # items in the structure's hierarchy are
-    _ITEM2DEPTH = \
+    # The ['_items', '_attributes'] depth for each level of
+    # the hierarchy
+    _ITEMSATTRS_DEPTH_TO_LEVELS = \
+        {# Models' level - ['_items', '_attributes']
+         2: "models",
+         # Chains' level - ['_items', '_attributes']
+         4: "chains",
+         # Segments' level - ['_items', '_attributes']
+         6: "segments",
+         # Residues' level - ['_items', '_attributes']
+         8: "residues",
+         # Atoms' level - ['_items', '_attributes']
+         10: "atoms"}
+
+    # The identifiers' depth for each level of the hierarchy
+    _IDS_DEPTH_TO_LEVELS = \
         {# Models' level
-         "model" : 1,
+         1 : "models",
          # Chains' level
-         "chain" : 2,
+         3 : "chains",
          # Segments' level
-         "segment" : 3, 
+         5 : "segments", 
          # Residues' level
-         "residue" : 4,
-         # Residues' attributes' level (for instance, 'res_name')
-         "residue_attribute" : 5,
+         7 : "residues",
          # Atoms' level
-         "atom" : 6,
-         # Atoms' attributes' level (for instance, 'atom_name')
-         "atom_attribute" : 7}
-
-    # A mapping between residues' three-letter names and residues'
-    # one-letter names (canonical residues + histidine
-    # protonation states)
-    _RESNAMES_3TO1 = \
-        {"ALA" : "A", "CYS" : "C", "ASP" : "D", "GLU" : "E",
-         "PHE" : "F", "GLY" : "G", "HIS" : "H", "ILE" : "I",
-         "LYS" : "K", "LEU" : "L", "MET" : "M", "ASN" : "N",
-         "PRO" : "P", "GLN" : "Q", "ARG" : "R", "SER" : "S",
-         "THR" : "T", "VAL" : "V", "TRP" : "W", "TYR" : "Y",
-         "HIE" : "H", "HID" : "H", "HIP" : "H"}
-
-    # Which residues are considered protein residues
-    _RESNAMES_PROTEIN = \
-        ["ALA", "CYS", "ASP", "GLU",
-         "PHE", "GLY", "HIS", "ILE",
-         "LYS", "LEU", "MET", "ASN",
-         "PRO", "GLN", "ARG", "SER",
-         "THR", "VAL", "TRP", "TYR",
-         "HIE", "HID", "HIP"]
-
-    # Which residues are considered DNA residues
-    _RESNAMES_DNA = ["DA", "DC", "DG", "DT"]
-
-    # Which residues are considered RNA residues
-    _RESNAMES_RNA = ["A", "C", "G", "U"]
+         9 : "atoms"}
 
 
     #------------------------ Initialization -------------------------#
@@ -101,8 +87,8 @@ class Structure:
             A nested dictionary containing the structure
 
         conect_data : ``dict``, optional
-            A nested dictionary containing the CONECT data
-            for the structure.
+            A nested dictionary containing the connectivity
+            data for the structure.
 
         name : ``str``, optional
             The name of the structure.
@@ -113,8 +99,7 @@ class Structure:
         and ``conect_data`` blank.
         """
 
-        #---------------- Set the atomic coordinates -----------------#
-
+        #-------------------------------------------------------------#
 
         # If no atomic coordinates were provided
         if atom_data is None:
@@ -129,37 +114,33 @@ class Structure:
             # provided
             self._atom_data = atom_data
 
+        #-------------------------------------------------------------#
 
-        #-------------------- Set the CONECT data --------------------#
-
-
-        # If no CONECT data were provided
+        # If no connectivity data were provided
         if conect_data is None:
 
             # If no atoms' coordinates were provided
             if atom_data is None:
 
-                # Set the CONECT data to an empty dictionary
+                # Set the connectivity data to an empty dictionary
                 self._conect_data = {}
 
             # Otherwise
             else:
 
-                # Set the CONECT data to a dictionary containing
-                # an empty dictionary for each of the models
-                # found in the atomic coordinates
+                # Set the connectivity data to a dictionary containing
+                # an empty dictionary for each of the models found
+                # in the atomic coordinates
                 self._conect_data = \
                     {mod : {} for mod in self.atom_data}
 
         # Otherwise
         else:
-            
-            # Set the CONECT data to the dictionary provided
+
+            # Set the connectivity data to the dictionary provided
             self._conect_data = conect_data
 
-
-        #----------------------- Set the name ------------------------#
-
+        #-------------------------------------------------------------#
 
         # Set the name of the structure
         self._name = name
@@ -190,8 +171,8 @@ class Structure:
 
     @property
     def conect_data(self):
-        """A dictionary containing the CONECT data associated
-        with the structure.
+        """A dictionary containing the connectivity data
+        associated with the structure.
         """
         
         return self._conect_data
@@ -246,6 +227,7 @@ class Structure:
         return (self.atom_data == other.atom_data \
                 and self.conect_data == other.conect_data)
 
+
     def __ne__(self,
                other):
         """Return ``True`` if any of the data attributes of ``self``
@@ -261,14 +243,468 @@ class Structure:
         # Check the inequality
         return not self.__eq__(other = other)
 
-    
+
+    def __setitem__(self,
+                    path,
+                    value):
+        """Set the items at the end of a 'path', where a
+        'path' is a tuple containing the identifiers or
+        the elements leading to the items (for instance,
+        a model, chain, segment, and residue to get to
+        the atoms belonging to the residue).
+        """
+
+        # If we only specified a model 
+        if len(path) == 1:
+
+            # Set the chains in the model
+            self._atom_data[path[0]]["_items"] = value
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model and a chain
+        elif len(path) == 2:
+
+            # Get the model and chain from the path
+            model, chain = path
+
+            # Set the segments in the chain
+            self._atom_data[model]["_items"][chain]["_items"] = \
+                value
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, and a segment
+        elif len(path) == 3:
+
+            # Get the model, chain, and segment from the path
+            model, chain, segment = path
+            
+            # Set the residues in the segment
+            self._atom_data[model][\
+                "_items"][chain]["_items"][segment]["_items"] = \
+                    value
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, a segment, and
+        # a residue
+        elif len(path) == 4:
+
+            # Get the model, chain, segment, and residue
+            # from the path
+            model, chain, segment, residue = path
+
+            # Set the atoms in the residue
+            self._atom_data[model][\
+                "_items"][chain]["_items"][segment][\
+                    "_items"][residue]["_items"] = value
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, a segment, a
+        # residue, and an atom
+        elif len(path) == 5:
+
+            # Get the model, chain, segment, residue,
+            # and atom from the path
+            model, chain, segment, residue, atom = path
+
+            # Set the atom's attributes
+            self._atom_data[model][\
+                "_items"][chain]["_items"][segment][\
+                    "_items"][residue]["_items"][atom] = value
+
+
+    def __getitem__(self,
+                    path):
+        """Return the items at the end of a 'path', where a
+        'path' is a tuple containing the identifiers or
+        the elements leading to the items (for instance,
+        a model, chain, segment, and residue to get to
+        the atoms belonging to the residue).
+        """
+
+        # If we only specified a model 
+        if len(path) == 1:
+
+            # Return the chains in the model
+            return self._atom_data[path[0]]["_items"]
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model and a chain
+        elif len(path) == 2:
+
+            # Get the model and chain from the path
+            model, chain = path
+
+            # Return the segments in the chain
+            return self._atom_data[model]["_items"][chain]["_items"]
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, and a segment
+        elif len(path) == 3:
+
+            # Get the model, chain, and segment from the path
+            model, chain, segment = path
+            
+            # Return the residues in the segment
+            return self._atom_data[model][\
+                "_items"][chain]["_items"][segment]["_items"]
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, a segment, and
+        # a residue
+        elif len(path) == 4:
+
+            # Get the model, chain, segment, and residue
+            # from the path
+            model, chain, segment, residue = path
+
+            # Return the atoms in the residue
+            return self._atom_data[model][\
+                "_items"][chain]["_items"][segment][\
+                    "_items"][residue]["_items"]
+
+        #-------------------------------------------------------------#
+
+        # If we specified a model, a chain, a segment, a
+        # residue, and an atom
+        elif len(path) == 5:
+
+            # Get the model, chain, segment, residue,
+            # and atom from the path
+            model, chain, segment, residue, atom = path
+
+            # Return the atom's attributes
+            return self._atom_data[model][\
+                "_items"][chain]["_items"][segment][\
+                    "_items"][residue]["_items"][atom]
+
 
     #------------------------ Private methods ------------------------#
 
 
+    def _should_recurse(self,
+                        key,
+                        value,
+                        selected,
+                        current_depth):
+        """Return whether we should keep on recursing in the
+        'atom_data' dictionary by checking whether we are at the
+        right model, chain, segment, residue, and atom.
+
+        Parameters
+        ----------
+        key : ``int``, ``str``, ``tuple``
+            The key we have to check to see if we are at the
+            correct model, chain, segment, or residue.
+
+        value : ``dict``
+            The dictionary we have to check to see if the model's,
+            chain's, segment's, or residue's atoms have any
+            of the selected values.
+
+        selected : ``dict``
+            A dictionary containing the ``"models"``, ``"chains"``,
+            ``"segments"``, ``"residues"``, and ``"atoms"``
+            through which we should recurse.
+
+            It also contains the attributes of the selected models,
+            chains, segments, and residues should have for us
+            to recurse through them.
+
+        current_depth : ``int``
+            The depth we are currently at in the recursion.
+
+        Returns
+        -------
+        should_recurse : ``bool``
+            Whether we should recurse through the current 
+            sub-structure of the 'atom_data' dictionary.
+        """
+
+        # If we are at a level where we should check if we should
+        # recurse
+        if current_depth in self._IDS_DEPTH_TO_LEVELS:
+
+            #---------------------------------------------------------#
+
+            # Get the type of items found at this depth
+            # from the depth itself
+            items_type = self._IDS_DEPTH_TO_LEVELS[current_depth]
+            
+            # Get the user-selected items for this item type
+            selected_items = selected[items_type]["_items"]
+
+            # Get the user-selected attributes for this item type
+            selected_attrs = selected[items_type]["_attributes"]
+
+            #---------------------------------------------------------#
+
+            # If there are user-selected items and the current
+            # one is not one of them
+            if selected_items:
+
+                # If the key is a tuple (it is a residue)
+                if isinstance(key, tuple):
+
+                    # If the first element is in the selected
+                    # items
+                    if key[0] not in selected_items \
+                    and key[2] not in selected_items \
+                    and key not in selected_items:
+
+                        # Do not recurse
+                        return False
+                
+                # Otherwise 
+                else:
+
+                    # If the entire key is not in the
+                    # selected items
+                    if key not in selected_items:
+
+                        # Do not recurse
+                        return False
+
+            #---------------------------------------------------------#
+
+            # If there are user-selected attributes
+            if selected_attrs and isinstance(selected_attrs, dict):
+
+                # For each attribute and associated values
+                for attr_name, attr_value in selected_attrs.items():
+                    
+                    # If the attribute exists in the structure
+                    # and its value does not match any of the
+                    # accepted ones            
+                    if attr_name in value["_attributes"] \
+                    and value["_attributes"][attr_name] \
+                        not in selected_attrs[attr_name]:
+
+                        # Do not recurse
+                        return False
+
+            #---------------------------------------------------------#
+
+            # If we arrived here without returning,
+            # recurse
+            return True
+
+        #-------------------------------------------------------------#
+
+        # If we are not at a level where we can check,
+        # recurse by default
+        return True
+
+
+    def _get_selected(self,
+                      models = None,
+                      models_attributes = None,
+                      chains = None,
+                      chains_attributes = None,
+                      segments = None,
+                      segments_attributes = None,
+                      residues = None,
+                      residues_attributes = None,
+                      atoms = None,
+                      atoms_attributes = None,
+                      extra_residues = None):
+        """Get the items to be considered in an operation.
+
+        Parameters
+        ----------
+        models : ``list``, optional
+            The models to be considered.
+
+        models_attributes : ``dict``, optional
+            A dictionary of attributes and their accepted
+            values. Only models whose values for the
+            specified attributes (if they exist) are
+            among the accepted values will be considered.
+
+        chains : ``list``, optional
+            The chains to be considered.
+
+        chains_attributes : ``dict``, optional
+            A dictionary of attributes and their accepted
+            values. Only chains whose values for the
+            specified attributes (if they exist) are
+            among the accepted values will be considered.
+
+        segments : ``list``, optional
+            The segments to be considered.
+
+        segments_attributes : ``dict``, optional
+            A dictionary of attributes and their accepted
+            values. Only segments whose values for the
+            specified attributes (if they exist) are
+            among the accepted values will be considered.
+
+        residues : ``list``, optional
+            The residues to be considered.
+
+        residues_attributes : ``dict``, optional
+            A dictionary of attributes and their accepted
+            values. Only residues whose values for the
+            specified attributes (if they exist) are
+            among the accepted values will be considered.
+
+        atoms : ``list``, optional
+            The atoms to be considered.
+
+        atoms_attributes : ``dict``, optional
+            A dictionary of attributes and their accepted
+            values. Only atoms whose values for the
+            specified attributes (if they exist) are
+            among the accepted values will be considered.
+
+        extra_residues : ``dict``, optional
+            A dictionary containing ``"protein"``,
+            ``"dna"``, and ``"rna"`` residues to be
+            considered part of the canonical sets for
+            these entities, despite not being part of
+            the sets.
+        """
+
+        # If a list of residues was specified
+        if residues is not None:
+
+            # For each possible group of residues
+            for group in _defaults.STRUCT_RESNAMES:
+
+                # If the user selected the group
+                if group in residues:
+
+                    # Get the canonical set of residues' names
+                    # for that group and add it to the 
+                    residues.extend(\
+                        _defaults.STRUCT_RESNAMES[group])
+
+                    # If a list of extra residues was passed
+                    if group in extra_residues:
+
+                        # Add the residues to the set
+                        residues.extend(\
+                            extra_residues[group])
+
+                    # Remove the name of the group from the
+                    # list of residues
+                    residues.remove(group)
+
+            #---------------------------------------------------------#
+
+            # If the user requested heteoresidues
+            if "het" in residues:
+
+                # If there are no residues' attributes yet
+                if residues_attributes is None:
+                    
+                    # Create the residues' attributes'
+                    # dictionary
+                    residues_attributes = {"is_het" : [True]}
+
+
+                # Otherwise
+                else:
+
+                    # Add the element to the residues' attributes
+                    residues_attributes["is_het"] = [True]
+
+                # Remove the element from the list of residues
+                residues.remove("het")
+
+            #---------------------------------------------------------#
+
+            # If we ended up with an empty list by removing
+            # the groups/heteroresidues
+            if not residues:
+
+                # Set the list of residues to an empty list
+                residues = []
+
+        #-------------------------------------------------------------#
+
+        # If a list of atoms was specified
+        if atoms is not None:
+
+            # Assume that every string element in the atoms' list is
+            # an atom's name
+            atoms_names = \
+                [elem for elem in atoms if isinstance(elem, str)]
+
+            # Assume that every integer in the atoms' list is
+            # an atom's serial number
+            atoms = \
+                [elem for elem in atoms if isinstance(elem, int)]
+
+            #---------------------------------------------------------#
+
+            # If any names were found
+            if atoms_names:
+
+                # If there are no atoms' attributes yet
+                if atoms_attributes is None:
+                    
+                    # Create the atoms' attributes' dictionary
+                    atoms_attributes = {"label_atom_id" : atoms_names}
+
+                # Otherwise
+                else:
+
+                    # Add the atoms' names to the atoms' attributes
+                    atoms_attributes["label_atom_id"] = atoms_names
+
+            #---------------------------------------------------------#
+
+            # If we ended up with an empty list by removing
+            # the groups/heteroresidues
+            if not atoms:
+
+                # Set the list of atoms to an empty list
+                atoms = []
+
+        #-------------------------------------------------------------#
+
+        # Return the dictionary of selected items and corresponding
+        # attributes - add an empty list if there are no selected
+        # items for a given level of the hierarchy, and an empty
+        # dictionary if there are no selected attributes
+        return \
+            {"models" : \
+              {"_items" : \
+                 models if models else [],
+               "_attributes" : \
+                 models_attributes if models_attributes else {}},
+             "chains" : \
+               {"_items" : \
+                  chains if chains else [],
+                "_attributes" : \
+                  chains_attributes if chains_attributes else {}},
+             "segments" : \
+               {"_items" : \
+                  segments if segments else [],
+                "_attributes" : \
+                  segments_attributes if segments_attributes else {}},
+             "residues" : \
+               {"_items" : \
+                  residues if residues else [],
+                "_attributes" : \
+                  residues_attributes if residues_attributes else {}},
+             "atoms" : \
+               {"_items" : \
+                  atoms if atoms else [],
+                "_attributes" : \
+                  atoms_attributes if atoms_attributes else {}}}
+
+
     def _update_conect_data(self,
                             mapping):
-        """Update the CONECT data for the structure.
+        """Update the connectivity data for the structure.
 
         Parameters
         ----------
@@ -277,31 +713,45 @@ class Structure:
             the new atom numbering.
         """
 
-        # If the structure has any associated CONECT data
+        # If the structure has associated connectivity data
         if self.conect_data:
 
-            # Initialize a dictionary to store the updated CONECT
-            # data, creating an empty dictionary for each model
-            # in the structure
+            # Initialize a dictionary to store the updated
+            # connectivity data, creating an empty dictionary
+            # for each model found in the structure
             conect_data_updated = \
                 {mod : {} for mod in self.conect_data}
 
-            # For each model in the CONECT data
+            # For each model in the existent connectivity data
             for mod in self.conect_data:
 
-                # For each CONECT record for the current model
+                # For each connectivity record for the current model
                 # (= the atom the record refers to and the record
                 # itself, containing the atoms bonded to the
-                # first one)
-                for atom_record, record \
+                # first one and information about the bond)
+                for atom_1, atoms_bonded \
                     in self.conect_data[mod].items():
+
+                    # Try to get the first atom's serial number
+                    try:
+
+                        atom_1_serial = \
+                            self._get_atom_serial((mod, *atom_1))
+
+                    # If the atom is not found (because, for instance,
+                    # it was removed from the structure)
+                    except KeyError:
+
+                        # Continue
+                        continue
+
+                    #-------------------------------------------------#
 
                     # Try to convert the atom's serial number
                     # to the new numbering
                     try:
 
-                        atom_record_updated = \
-                            mapping[mod][atom_record]
+                        mapping[mod][atom_1_serial]
 
                     # If the atom was not found in the mapping
                     # (because, for instance, it was removed
@@ -311,19 +761,34 @@ class Structure:
                         # Go to the next atom
                         continue
 
-                    # Initialize an empty list to store the new
-                    # record
-                    record_updated = []
+                    #-------------------------------------------------#
 
-                    # For each atom in the record
-                    for atom_bonded in record:
+                    # Initialize an empty dictionary to store the
+                    # new record
+                    atoms_bonded_updated = {}
+
+                    # For each atom in the record and
+                    # associated data
+                    for atom_2, bond_data in atoms_bonded.items():
+
+                        # Try to get the second atom's serial number
+                        try:
+
+                            atom_2_serial = \
+                                self._get_atom_serial((mod, *atom_2))
+
+                        # If the atom is not found (because, for
+                        # instance, it was removed from the structure)
+                        except KeyError:
+
+                            # Continue
+                            continue
 
                         # Try to convert the atom's serial number
                         # to the new numbering
                         try:
 
-                            record_updated.append(\
-                                mapping[mod][atom_bonded])
+                            mapping[mod][atom_2_serial]
 
                         # If the atom was not found (because, for
                         # instance, it was removed from the structure)
@@ -332,113 +797,168 @@ class Structure:
                             # Go to the next atom
                             continue
 
+                        # Add the second atom to the new record
+                        atoms_bonded_updated[atom_2] = bond_data
+
                     # If the length of the new record is equal to the
                     # length of the old record (= all atoms were added,
                     # meaning that no atoms were missing from the
                     # current record)
-                    if len(record_updated) == len(record):
+                    if len(atoms_bonded_updated) == len(atoms_bonded):
 
-                        # Add the record to the dictionary of
-                        # updated CONECT data
-                        conect_data_updated[mod][\
-                            atom_record_updated] = record_updated
+                        # Add the record to the dictionary containing
+                        # the updated connectivity data
+                        conect_data_updated[mod][atom_1] = \
+                            atoms_bonded_updated
 
-            # Update the CONECT data for the structure
+            # Update the connectivity data for the structure
             self._conect_data = conect_data_updated
 
 
     def _add_bonds(self,
-                   bonds):
-        """Add bonds between atoms (it modifies the CONECT data,
-        while the atomic coordinates remain unchanged).
+                   bonds,
+                   bonds_attributes):
+        """Add bonds between atoms (it modifies the connectivity
+        data, while the atomic coordinates remain unchanged).
 
         Parameters
         ----------
         bonds : ``list``
             A list of tuples, each representing a bond between two
-            atoms and whether the bond is a ``"single"``, 
-            ``"double"``, or ``"triple"`` bond.
+            atoms. The tuple must contain the first atom, the
+            second atom, the bond's type and the bond's order.
 
-            An atom can be represented either by its unique
-            serial number or by its "path", namely a tuple
-            containing the model, chain, segment, and residue
+            An atom must be represented by its "path", namely a
+            tuplecontaining the model, chain, segment, and residue
             the atom belongs to, plus the atom's name. This is
             based on the assumption that, within each residue,
             atoms must have unique names.
 
-            For instance, a single bond between atom 1 and atom 2
-            could be represented as ``(1, 2, "single")`` or as
-            ``((1, "A", "", (1, " "), "N"), 
-            (1, "A", "", (1, " "), "CA"),
-            "single")``, assuming that both atoms belong to
-            model 1, chain A, an unnamed segment, residue 1 with
-            insertion code " " (= no insertion code), and one is
-            named N, while the other is named CA. The model's
-            specification is necessary because atoms in the same
-            chain, segment, and residue may have different serial
-            numbers in different models.
+            For instance, a single covalent bond between
+            the N atom of MET 1 in model 1, chain A, segment '' and
+            the CA atom of the same residue must be represented as
+            ``((1, "A", "", (1, "", "MET"), "N"), 
+            (1, "A", "", (1, "", "MET"), "CA"), "covale",
+            "sing")``.
 
-            Each bond should be specified only once (for instance,
-            we should not specify a bond between atom 2 and atom 1
-            if we have already specified a bond between atom 1 and
-            atom 2) since, for each bond specified, the CONECT records
-            for both atoms involved in the bond will be updated.
+            Supported bond types are:
+            - ``"covale"`` for covalent bonds.
+            - ``"disulf"`` for disulfide bridges.
+            - ``"hydrog"`` for hydrogen bonds.
+            - ``"metalc"`` for metal coordination.
+
+            Supported bond orders are:
+            - ``"sing"`` for single bonds.
+            - ``"doub"`` for double bonds.
+            - ``"trip"`` for triple bonds.
+            - ``"quad"`` for quadruple bonds.
+
+            Each bond should be specified only once since,
+            for each bond specified, the connectivity data for
+            both atoms involved in the bond will be updated.
+
+        bonds_attributes : ``dict``, optional
+            A dictionary mapping each bond in ``bonds`` to a dictionary
+            of attributes that will be assigned to the bond.
         """
 
-        # Create a copy of the current CONECT data that will
+        # Create a copy of the current connectivity data that will
         # be updated with the new bonds
         conect_data_updated = copy.deepcopy(self.conect_data)
 
-        # For each bond (first atom, second atom, and bond type)
-        for atom_1, atom_2, bond_type in bonds:
+        # For each bond (first atom, second atom, bond type,
+        # and bond order)
+        for atom_1, atom_2, bond_type, bond_order in bonds:
 
-            # If the first atom is defined as a path to an atom
-            if isinstance(atom_1, tuple):
+            # Get the bond's identifier
+            bond_id = (atom_1, atom_2, bond_type, bond_order)
 
-                # Get the atom's serial number from its path
-                atom_1 = self._get_atom_serial(path = atom_1)
+            #---------------------------------------------------------#
 
-            # If the second atom is defined as a path to an atom
-            if isinstance(atom_2, tuple):
+            # Get the supported bond types
+            supported_bond_types = _defaults.STRUCT_BOND_TYPES
 
-                # Get the atom's serial number from its path
-                atom_2 = self._get_atom_serial(path = atom_2)
+            # If the bond type keyword is invalid
+            if bond_type not in supported_bond_types:
 
-            # If the bond is a single bond
-            if bond_type == "single":
+                # Get a string representing the supported
+                # bond types
+                supported_bond_types_str = \
+                    ", ".join([f"'{bt}'" for bt \
+                               in supported_bond_types])
 
-                # Create the CONECT records representing
-                # the new bond for both atoms
-                new_record_1, new_record_2 = \
-                    [atom_2], [atom_1]
+                # Raise an error
+                errstr = \
+                    f"Unrecognized bond type '{bond_type}' " \
+                    f"for the bond between atom {atom_1} and " \
+                    f"atom {atom_2}. Supported bond types " \
+                    f"are: {supported_bond_types_str}."
+                raise ValueError(errstr)
 
-            # If the bond is a double bond
-            elif bond_type == "double":
+            #---------------------------------------------------------#
 
-                # Create the CONECT records representing
-                # the new bond for both atoms
-                new_record_1, new_record_2 = \
-                    [atom_2, atom_2], [atom_1, atom_1]
+            # Get the supported bond orders
+            supported_bond_orders = _defaults.STRUCT_BOND_ORDERS
 
-            # If the bond is a triple bond
-            elif bond_type == "triple":
-                
-                # Create the CONECT records representing
-                # the new bond for both atoms
-                new_record_1, new_record_2 = \
-                    [atom_2, atom_2, atom_2], [atom_1, atom_1, atom_1]
+            # If the bond order keyword is invalid
+            if bond_order not in supported_bond_orders:
 
-            # For each model's CONECT records
+                # Get a string representing the supported
+                # bond orders
+                supported_bond_orders_str = \
+                    ", ".join([f"'{bo}'" for bo \
+                               in supported_bond_orders])
+
+                # Raise an error 
+                errstr = \
+                    f"Unrecognized bond order '{bond_order}' " \
+                    f"for the bond between atom {atom_1} and " \
+                    f"atom {atom_2}. Supported bond orders " \
+                    f"are: {supported_bond_orders_str}."
+                raise ValueError(errstr)
+
+            #---------------------------------------------------------#
+
+            # Create the connectivity record representing
+            # the new bond for the first atom
+            new_record_1 = \
+                {atom_2 : \
+                    {"conn_type_id" : bond_type,
+                     "pdbx_value_order" : bond_order}}
+
+            # Create the connectivity record representing
+            # the new bond for the second atom
+            new_record_2 = \
+                {atom_1 : \
+                    {"conn_type_id" : bond_type,
+                     "pdbx_value_order" : bond_order}}
+
+            #---------------------------------------------------------#
+
+            # If there are attributes for the bond
+            if bond_id in bonds_attributes:
+
+                # Add them to the new record for the first atom
+                new_record_1[atom_2].update(bonds_attributes[bond_id])
+
+                # Add them to the new record for the second atom
+                new_record_2[atom_1].update(bonds_attributes[bond_id])
+
+            #---------------------------------------------------------#
+
+            # For each model's connectivity records
             for mod in self.conect_data:
 
-                # If we already have a CONECT record for the
+                #-----------------------------------------------------#
+
+                # If we already have a connectivity record for the
                 # first atom
                 if atom_1 in conect_data_updated[mod]:
 
                     # Update it with the new record
                     record_1 = \
-                        [*conect_data_updated[mod][atom_1],
-                         *new_record_1]
+                        {**conect_data_updated[mod][atom_1],
+                         **new_record_1}
 
                 # Otherwise
                 else:
@@ -446,19 +966,19 @@ class Structure:
                     # Create a new record for the first atom
                     record_1 = new_record_1
 
-                # Update/add the record to the CONECT data,
-                # making sure to sort the atoms in the record
-                # in ascending order of serial number
-                conect_data_updated[mod][atom_1] = sorted(record_1)
+                # Add the record to the connectivity data
+                conect_data_updated[mod][atom_1] = record_1
 
-                # If we already have a CONECT record for the
+                #-----------------------------------------------------#
+
+                # If we already have a connectivity record for the
                 # second atom
                 if atom_2 in conect_data_updated[mod]:
 
                     # Update it with the new record
                     record_2 = \
-                        [*conect_data_updated[mod][atom_2],
-                         *new_record_2]
+                        {**conect_data_updated[mod][atom_2],
+                         **new_record_2}
 
                 # Otherwise
                 else:
@@ -466,21 +986,24 @@ class Structure:
                     # Create a new record for the second atom
                     record_2 = new_record_2
                 
-                # Update/add the record to the CONECT data,
-                # making sure to sort the atoms in the record
-                # in ascending order of serial number
-                conect_data_updated[mod][atom_2] = sorted(record_2)
+                # Add the record to the connectivity data
+                conect_data_updated[mod][atom_2] = record_2
 
-        # Sort the atoms in each model so that the CONECT data
-        # are reported in the correct order (= in ascending
+        #-------------------------------------------------------------#
+
+        # Sort the atoms in each model so that the connectivity
+        # records are reported in the correct order (= in ascending
         # order of the atoms' serial numbers)
         conect_data_sorted = \
-            {mod : \
-                {k : conect_data_updated[mod][k] for k  \
-                 in sorted(conect_data_updated[mod])} \
-             for mod in conect_data_updated}
+            {model : \
+                {atom_1 : \
+                    {atom_2 : data for atom_2, data \
+                     in sorted(conect_data_updated[model][\
+                        atom_1].items())} \
+                 for atom_1 in sorted(conect_data_updated[model])} \
+             for model in conect_data_updated}
 
-        # Update the CONECT data for the structure
+        # Update the connectivity data for the structure
         self._conect_data = conect_data_sorted
 
 
@@ -511,14 +1034,17 @@ class Structure:
         mod, ch, seg, res, atom_name = path
 
         # Get the sub-structure where the atom is stored
-        sub_struct = self.atom_data[mod][ch][seg][res]["atoms"]
+        sub_struct = \
+            self.atom_data[mod]["_items"][ch]["_items"][\
+                seg]["_items"][res]["_items"]
 
         # For each atom in the sub-structure
         for atom in sub_struct:
 
             # If the current atom's name matches the one
             # we are looking for
-            if sub_struct[atom]["atom_name"] == atom_name:
+            if sub_struct[atom]["_attributes"]["label_atom_id"] == \
+                atom_name:
                 
                 # Return the atom's serial number (there is no
                 # need to check any further because we are
@@ -527,97 +1053,674 @@ class Structure:
                 return atom
 
 
-    def _get_last(self,
-                  items_type):
-        """Get the last item of a specfic type in the structure
-        by recursively traversing the 'atom_data' dictionary.
+    def _renumber_atoms(self,
+                        start = 1):
+        """Renumber the atoms in the structure so that each model's
+        atom numbering starts from 'start', and each chain's atom
+        numbering starts from the number of the atom ending the
+        previous chains plus 2 (to accommodate the TER record at
+        the end of a chain).
 
         Parameters
         ----------
-        items_type : ``str``
-            The type of items to get the last of (model, chain,
-            segment, residue, or atom).
+        start : ``int``, ``1``
+            The new starting number for the atoms' serial numbers.
+        """
+
+        # We use iteration instead of recursion because, in this
+        # case, it's much simpler and more readable
+
+        # Create a dictionary containing, for each model,
+        # the mapping between the old serial numbers and the
+        # new ones
+        oldnum2newnum = {mod : {} for mod in self.atom_data}
+
+        # Create a copy of the 'atom_data' dictionary to modify
+        struct_copy = copy.deepcopy(self.atom_data)
+
+        #-------------------------------------------------------------#
+
+        # For each model in the structure
+        for mod, mod_d in self.atom_data.items():
+            
+            # Re-set the current atom count (since, for each model,
+            # serial numbers start from 1)
+            current_atom_count = 1
+            
+            # For each chain in the current model
+            for i, (ch, ch_d) in enumerate(mod_d["_items"].items()):
+                
+                # If we are not in the first chain of the model
+                if i != 0:
+
+                    # The starting number will be the current one
+                    # plus 1 to accommodate the previous chain's
+                    # TER record
+                    current_atom_count = current_atom_count + 1
+                
+                # For each segment in the current chain
+                for seg, seg_d in ch_d["_items"].items():
+                    
+                    # For each residue in the current segment
+                    for res, res_d in seg_d["_items"].items():
+
+                        # Renumber all atoms in the residue
+                        new_res_d = \
+                            {rel_index + current_atom_count : at_d \
+                             for rel_index, (_, at_d) \
+                             in enumerate(res_d["_items"].items())}
+
+                        # Add the new atoms to the residues,
+                        # overwriting the old ones
+                        struct_copy[mod]["_items"][ch][\
+                            "_items"][seg]["_items"][res][\
+                                "_items"] = new_res_d
+
+                        # Update the mapping between the old
+                        # numbering and the new numbering
+                        oldnum2newnum[mod].update(\
+                            {old : rel_index + current_atom_count \
+                             for rel_index, (old, _) \
+                             in enumerate(res_d["_items"].items())})
+                            
+                        # Update the current atom count
+                        current_atom_count += len(new_res_d)
+
+
+        #--------------- Update the connectivity data ----------------#
+
+
+        # Update the 'atom_data' dictionary
+        self._atom_data = struct_copy
+
+        # Update the connectivity data associated with the structure
+        self._update_conect_data(mapping = oldnum2newnum)
+
+
+    def _get(self,
+             action,
+             level,
+             squeeze,
+             elements_type,
+             selected,
+             attribute = None):
+        """Generic 'get' method to retrieve elements from the
+        'atom_data' dictionary.
+
+        Parameters
+        ----------
+        action : ``str``, {``"get_unique"``, ``"get_max"``, \
+            ``"get_min"``}
+            The name of the 'get' action to perform:
+
+            - ``"get_unique"`` retrieves all unique elements
+               of a specific type or all unique values for a
+               specific attribute.
+
+            - ``"get_min"`` retrieves the minimum value
+              found for all elements of a specific type or
+              the minimum value found for a specific attribute.
+
+            - ``"get_max"`` retrieves the maximum value
+              found for all elements of a specific type or
+              the maximum value found for a specific attribute.
+
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}
+            At what level of the hierarchy we are getting
+            the items.
+
+        squeeze : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}
+            At which level of the hierarchy items should be
+            'squeezed', meaning that the 'get' action will
+            involve all values found at deeper levels as if
+            they belonged to the same level. For instance, if
+            ``action = "get_unique"``,``items_type = "atoms"``,
+            and ``squeeze = "chains"``, the result will be a
+            dictionary mapping each model to the chains it
+            contains, and each chains will be mapped to a list
+            containing all unique atoms' serial numbers found
+            in the chain, therefore "skipping" the segments'
+            and residues' levels.
+
+            If ``squeeze`` is not specified, it will automatically
+            be set to the level above that where the last items
+            specified in the hierarchy are.
+
+            The hierarchy goes: model > chain > segment > 
+            residue > atom.
+
+        elements_type : ``str``, {``"items"``, ``"attributes"``}
+            The type of elements we are retrieving.
+
+        selected : ``dict``
+            The dictionary containing items (selected by either their
+            IDs or by their attributes) that will be considered in
+            the 'get' action.
+
+        attribute : ``str``, optional
+            The name of the attribute whose values should
+            be retrieved.
 
         Returns
         -------
-        last_item : ``str`` or ``int`` or ``tuple``
-            The last item of the specified type (model, chain,
-            segment, residue, or atom).
+        result : ``dict``
+            A dictionary containing the result of the 'get'
+            action performed.
         """
-
+        
 
         #------------------- Define the recursion --------------------#
 
 
-        def recursive_step(struct,
-                           target_depth,
-                           current_depth = 1):
-            
-            # If the current sub-structure is not a dictionary
-            if not isinstance(struct, dict):
+        # Inner recursive step to get the desired values below
+        # 'merge_depth'
+        def _inner_recursive_step(struct,
+                                  selected,
+                                  elements_type,
+                                  current_depth):
 
-                # Return None
-                return None
-
-            # If the current depth is the target depth
+            # If we reached the target depth
             if current_depth == target_depth:
 
-                # Return the last (= highest) key found in
-                # the sub-structure
-                return max(struct.keys(),
-                           default = None)
-
-            # Set the default last item to None
-            last_item = None
-
-            # For each sub-structure in the current dictionary
-            for sub_struct in struct.values():
-
-                # Get the last (= maximum) item in the sub-structure
-                last_in_sub_struct = \
-                    recursive_step(struct = sub_struct,
-                                   target_depth = target_depth,
-                                   current_depth = current_depth + 1)
+                # If the target depth is the models' depth
+                if current_depth == 1:
+                    
+                    # The depth of the items we are checking
+                    # is only one level down in the
+                    # _ACTION2DEPTH2items dictionary
+                    items_depth = current_depth + 1
                 
-                # If the recursion returned an item that is not None
-                if last_in_sub_struct is not None:
+                # Otherwise
+                else:
+                    
+                    # The depth of the items we are checking
+                    # is teo level down in the
+                    # _ACTION2DEPTH2items dictionary
+                    items_depth = current_depth + 2
 
-                    # If the current last item is None or the
-                    # item returned is higher than the current
-                    # last item
-                    if last_item is None \
-                    or last_in_sub_struct > last_item:
-                        
-                        # Update the last item with the current one
-                        last_item = last_in_sub_struct
+                #-----------------------------------------------------#
 
-            # Return the last item
-            return last_item
+                # Get the user-selected items
+                selected_items = \
+                    selected[self._ITEMSATTRS_DEPTH_TO_LEVELS[\
+                        items_depth]]["_items"]
+
+                # Get the user-selected attributes
+                selected_attrs = \
+                    selected[self._ITEMSATTRS_DEPTH_TO_LEVELS[\
+                        items_depth]]["_attributes"]
+
+                #-----------------------------------------------------#
+
+                # If we are checking models
+                if current_depth == 1:
+
+                    # If no selected models were provided
+                    if not selected_items:
+
+                        # All models will be included
+                        selected_items = list(struct.keys())
+
+                    # The items to check will be the entire
+                    # current structure
+                    items_to_check = struct
+
+                    # The attributes of the previous items in
+                    # the hierarchy will be an empty dictionary
+                    # (models are the first items in the hierarchy)
+                    attrs_prev = {}
+
+                    # There are no user-selected attributes
+                    # for the previous items in the hierarchy
+                    # (models are the first items in the hierarchy)
+                    selected_attrs_prev = {}
+
+                #-----------------------------------------------------#
+
+                # Otherwise
+                else:
+
+                    # If no selected items were provided
+                    if not selected_items:
+
+                        # All items will be included
+                        selected_items = list(struct["_items"].keys())
+                    
+                    # The items to check will be the ones in the
+                    # '_items' dictionary
+                    items_to_check = struct["_items"]
+
+                    # The attributes of the previous items in
+                    # the hierarchy will be the attributes
+                    # associated with the current structure
+                    attrs_prev = struct["_attributes"]
+
+                    # Get the user-selected attributes for the previous
+                    # items in the hierarchy (they sit exactly at
+                    # the current depth)
+                    selected_attrs_prev = \
+                        selected[self._ITEMSATTRS_DEPTH_TO_LEVELS[\
+                            current_depth]]["_attributes"]
+
+                #-----------------------------------------------------#
+
+                # Initialize an empty dictionary where the
+                # items that will be considered will be stored
+                considered_items = {}
+
+                #-----------------------------------------------------#
+                
+                # For each item and associated dictionary
+                # in the current structure
+                for item, item_dict in items_to_check.items():
+
+                    #-------------------------------------------------#
+
+                    # Set a flag for whether to consider the item
+                    to_consider = False
+
+                    #-------------------------------------------------#
+                    
+                    # If the item is a tuple (it is a residue)
+                    if isinstance(item, tuple):
+
+                        # If the first element is in the selected
+                        # items
+                        if item[0] in selected_items:
+
+                            # Consider the current item
+                            to_consider = True
+
+                        # If the third element is in the selected
+                        # items
+                        if item[2] in selected_items:
+
+                            # Consider the current item
+                            to_consider = True
+
+                    #-------------------------------------------------#
+                    
+                    # If the item is in the selected ones
+                    if item in selected_items:
+
+                        # Do not consider the current item
+                        to_consider = True
+
+                    #-------------------------------------------------#
+
+                    # For each attribute of the previous item in the
+                    # hierarchy
+                    for attr_name, attr_value in attrs_prev.items():
+
+                        # If the attribute is one of those we have
+                        # to check, and its value is not in the
+                        # list of accepted values
+                        if attr_name in selected_attrs_prev \
+                        and attr_value \
+                            not in selected_attrs_prev[attr_name]:
+
+                            # Do not consider the current item
+                            to_consider = False
+
+                    #-------------------------------------------------#
+
+                    # If we are collecting items (rather than
+                    # attributes)
+                    if elements_type == "items":
+
+                        # For each item's attribute and the
+                        # attribute's associated value
+                        for attr_name, attr_value \
+                        in item_dict["_attributes"].items():
+
+                            # If the attribute is one of those
+                            # we have to check, and its value
+                            # is not in the list of accepted
+                            # values
+                            if attr_name in selected_attrs \
+                            and attr_value \
+                                not in selected_attrs[attr_name]:
+                                
+                                # Do not consider the item
+                                to_consider = False
+
+                    #-------------------------------------------------#
+                    
+                    # If wee need to consider the item
+                    if to_consider:
+
+                        # Add the item and associted dictionary
+                        # to the items to be considered
+                        considered_items[item] = item_dict
+
+                #-----------------------------------------------------#
+
+                # If we are collecting items
+                if elements_type == "items":
+
+                    # Return the unique items found at this level
+                    # (it should be all of them since dictionary
+                    # keys are unique)
+                    return set(considered_items.keys())
+
+                # If we are collecting attributes
+                elif elements_type == "attributes":
+
+                    # Return the unique values for the attribute
+                    # of interest in the considered items
+                    return \
+                        set([considered_items[k]["_attributes"][\
+                                selected_attrs[0]] \
+                             for k in considered_items])
+
+            #---------------------------------------------------------#
+
+            # Otherwise
+            else:
+
+                # Create an empty set to store the collected values
+                collected_values = set()
+
+                # For each key and associated sub-structure in the
+                # current structure
+                for key, sub_struct in struct.items():
+
+                    # Get whether we should recurse
+                    should_recurse = \
+                        self._should_recurse(\
+                            key = key,
+                            value = sub_struct,
+                            selected = selected,
+                            current_depth = current_depth)
+
+                    # If we should recurse
+                    if should_recurse:
+
+                        # Update the collected values
+                        collected_values.update(\
+                            _inner_recursive_step(\
+                                struct = sub_struct,
+                                selected = selected,
+                                elements_type = elements_type,
+                                current_depth = current_depth + 1))
+
+                # Return the collected values
+                return collected_values
 
 
-        #--------------------- Get the last item ---------------------#
+        # Outer recursive step to get the desired values above and
+        # at 'merge_depth'
+        def _outer_recursive_step(struct,
+                                  action,
+                                  selected,
+                                  target_depth,
+                                  merge_depth,
+                                  elements_type,
+                                  current_depth = 1):
+
+            # If the current depth is the depth at which values
+            # should be merged
+            if current_depth == merge_depth:
+
+                # Initialize an empty dictionary to store the current
+                # result
+                result = {}
+                
+                # For each key and associated sub-structure
+                # in the current structure
+                for key, sub_struct in struct.items():
+
+                    # Get whether we should recurse
+                    should_recurse = \
+                        self._should_recurse(\
+                            key = key,
+                            value = sub_struct,
+                            selected = selected,
+                            current_depth = current_depth)
+
+                    # If we should recurse
+                    if should_recurse:
+
+                        # Get the collected values
+                        collected_values = \
+                            _inner_recursive_step(\
+                                struct = sub_struct,
+                                selected = selected,
+                                elements_type = elements_type,
+                                current_depth = current_depth + 1)
+
+                        # If we need to get the unique values
+                        if action == "get_unique":
+
+                            # Convert the set into a list, sort
+                            # it, and return it
+                            result[key] = sorted(collected_values)
+
+                        # If we need to get the minimum value
+                        elif action == "get_min":
+
+                            # Find the minimum value and return it
+                            result[key] = min(collected_values)
+
+                        # If we need to get the maximum
+                        elif action == "get_max":
+
+                            # Find the maximum value and return it
+                            result[key] = max(collected_values)
+
+                # Return the result
+                return result
+
+            #---------------------------------------------------------#
+
+            # Otherwise
+            else:
+
+                # Create an empty dictionary to store the result
+                result = {}
+
+                # For each key and associated sub-structure
+                # in the current structure
+                for key, sub_struct in struct.items():
+
+                    # Get whether we should recurse
+                    should_recurse = \
+                        self._should_recurse(\
+                            key = key,
+                            value = sub_struct,
+                            selected = selected,
+                            current_depth = current_depth)
+
+                    # If we should recurse
+                    if should_recurse:
+
+                        #---------------------------------------------#
+
+                        # If we are at a ['_items', '_attributes']
+                        # level
+                        if key in ("_items", "_attributes"):
+
+                            # If we are at the '_attributes'
+                            if key == "_attributes":
+
+                                # Ignore them
+                                continue
+                            
+                            # The sub-structure to recurse through
+                            # will be the current sub-structure
+                            result[key] = \
+                                _outer_recursive_step(\
+                                    struct = sub_struct,
+                                    action = action,
+                                    selected = selected,
+                                    target_depth = target_depth,
+                                    merge_depth = merge_depth,
+                                    elements_type = elements_type,
+                                    current_depth = current_depth + 1)
+
+                        #---------------------------------------------#
+
+                        # Otherwise
+                        else:
+
+                            # The sub-structure to recurse through
+                            # will be the '_items' dictionary in
+                            # the current sub-structure (in this
+                            # case, 'current_depth' becomes
+                            # 'current_depth + 2' for the next
+                            # level since we are skipping the
+                            # ['_items', '_attribute'] level just
+                            # below
+                            result[key] = \
+                                _outer_recursive_step(\
+                                    struct = sub_struct["_items"],
+                                    action = action,
+                                    selected = selected,
+                                    target_depth = target_depth,
+                                    merge_depth = merge_depth,
+                                    elements_type = elements_type,
+                                    current_depth = current_depth + 2)
+
+                # Return the result
+                return result
 
 
-        # Get the depth corresponding to where the items we want
-        # to take the last of are stored in the structure
-        target_depth = self._ITEM2DEPTH[items_type]
+        #---------------------------- Get ----------------------------#
 
-        # Find the last item of the specified type (we can pass the
-        # 'atom_data' attribute directly because it will not be
-        # modified by the recursion)
-        return recursive_step(struct = self.atom_data,
-                              target_depth = target_depth)
+
+        # Fill in the missing spots in the 'selected' dictionary
+        # with empty lists/dictionaries
+        selected = \
+            {k : {"_items" : \
+                    selected.get(k, {}).get("_items", []),
+                  "_attributes" : \
+                    selected.get(k, {}).get("_attributes", {})} \
+             for k in self._IDS_DEPTH_TO_LEVELS.values()}
+
+        # If an attribute was specified
+        if attribute is not None:
+
+            # If attributes for the given level were specified
+            if selected[level]["_attributes"]:
+
+                # Warn the user
+                warnstr = \
+                    "When an 'attribute' is specified for level " \
+                    f"'{level}', the '{level}_attributes' option " \
+                    "is ignored."
+                logger.warning(warnstr)
+
+            # Set the attribute for the given level
+            selected[level]["_attributes"] = [attribute]
+
+        #-------------------------------------------------------------#
+
+        # Get the target depth from the 'level' keword
+        target_depth = \
+            {v : k for k, v \
+             in self._ITEMSATTRS_DEPTH_TO_LEVELS.items()}[level] - 2
+
+        #-------------------------------------------------------------#
+
+        # If 'squeeze' was not specified
+        if squeeze is None:
+
+            # The 'merge_depth' will be just one level above
+            # (for instance, 'segments' for 'residues' and
+            # 'chains' for 'segments')
+            merge_depth = target_depth - 1
+
+        # If we need to 'squeeze' everything into a list/value
+        # in the end
+        elif squeeze == "everything":
+
+            # The merge depth will be that of models
+            merge_depth = \
+                {v : k for k, v \
+                 in self._IDS_DEPTH_TO_LEVELS.items()}["models"]
+
+        # Otherwise
+        else:
+
+            # The 'merge_depth' will be the specified level
+            merge_depth = \
+                {v : k for k, v \
+                 in self._IDS_DEPTH_TO_LEVELS.items()}[squeeze]
+
+        #-------------------------------------------------------------#
+        
+        # Recursively traverse the structure and get the result
+        result = _outer_recursive_step(\
+                    struct = self.atom_data,
+                    action = action,
+                    selected = selected,
+                    target_depth = target_depth,
+                    merge_depth = merge_depth,
+                    elements_type = elements_type)
+
+        #-------------------------------------------------------------#
+
+        # If we need to 'squeeze' everything into one list/value
+        if squeeze == "everything":
+
+            # Get all values from the dictionary of results
+            values = list(result.values())
+
+            # We are sure that we either have one value or a
+            # dictionary of depth 1 because of how we recursed
+            # through the structure if 'squeeze' was 'everything'
+
+            # If we have only one value
+            if len(values) == 1:
+
+                # The 'unique' values will be just the values we have
+                unique_values = values
+
+            # Otherwise
+            else:
+
+                # Get the unique values from the result (= it is a
+                # dictionary mapping the models' numbers to either a
+                # set of unique values or a minimum/maximum value)
+                unique_values = \
+                    set(itertools.chain.from_iterable(values))
+
+            # If we need to get unique values
+            if action == "get_unique":
+                
+                # Convert the set of unique values into a list,
+                # sort it, and return it
+                return sorted(list(unique_values))
+
+            # If we need to get the minimum value
+            elif action == "get_min":
+
+                # Return the minimum value found in the set
+                return min(unique_values)
+
+            # If we need to get the maximum value
+            elif action == "get_max":
+
+                # Return the maximum value found in the set
+                return max(unique_values)
+
+        # Otherwise
+        else:
+
+            # Return the result as it is
+            return result
 
 
     def _merge(self,
                other):
-        """Merge two ``Structure`` instances and return
-        a new ``Structure``.
+        """Merge two structures.
 
         Parameters
         ----------
         other : ``pdbcraft.structure.Structure``
-            The ``Structure`` to be merged with the current one.
+            The structure to be merged with the current one.
 
         Returns
         -------
@@ -632,8 +1735,7 @@ class Structure:
         def recursive_step(struct,
                            other_struct):
 
-            # If none of the current sub-structures is
-            # a dictionary
+            # If none of the current sub-structures is a dictionary
             if not isinstance(struct, dict) \
             or not isinstance(other_struct, dict):
 
@@ -649,6 +1751,7 @@ class Structure:
             for key, sub_struct in other_struct.items():
 
                 # If the key is already in the merged structure
+                # (= they key is already in the 'self' structure)
                 if key in merged:
 
                     # Add the values found associated with the same
@@ -677,7 +1780,8 @@ class Structure:
 
             # Raise an error
             errstr = \
-                "'other' must be a Structure instance."
+                f"'other' must be a {self.__class__.__name__} " \
+                "instance."
             raise TypeError(errstr)
 
         # If the two structures do not have the same number
@@ -691,20 +1795,27 @@ class Structure:
                 "they cannot be merged."
             raise ValueError(errstr)
 
-        # Get the serial number of the last atom in the current
-        # structure
-        last_atom = self._get_last(items_type = "atom")
+        #-------------------------------------------------------------#
+
+        # Get the serial number of the last atom
+        last_atom = self.get_items(action = "get_max",
+                                   level = "atoms",
+                                   squeeze = "everything")
 
         # Renumber the atoms in the 'other' structure starting
-        # from the last atom in the current structure
-        other._renumber_atoms(start = last_atom)
+        # from the last atom in the current structure - this is
+        # needed so that no atoms get overwritten while merging
+        # the two structures
+        other._renumber_atoms(start = last_atom + 1)
+
+        #-------------------------------------------------------------#
 
         # Merge the atomic coordinates of the two structures
         merged_atom_data = \
             recursive_step(struct = self.atom_data,
                            other_struct = other.atom_data)
 
-        # Merge the CONECT data of the two structures
+        # Merge the connectivity data of the two structures
         merged_conect_data = \
             recursive_step(struct = self.conect_data,
                            other_struct = other.conect_data)
@@ -714,279 +1825,811 @@ class Structure:
             self.__class__(atom_data = merged_atom_data,
                            conect_data = merged_conect_data)
 
-        # Renumber the atoms of the merged structure starting
-        # from 1
+        # Renumber the atoms of the merged structure starting from 1
         merged._renumber_atoms()
+
+        #-------------------------------------------------------------#
 
         # Return the merged structure
         return merged
 
 
-    def _relabel(self,
-                 action,
-                 item,
-                 mapping = None,
-                 start = None,
-                 attribute = None,
-                 models = None,
-                 chains = None,
-                 segments = None,
-                 residues = None,
-                 residues_types = None):
-        """Re-label models, chains, segments, residues, or atoms,
-        or assigm a new value to one of their attributes.
+    def _modify(self,
+                action,
+                elements_type,
+                selected,
+                level = None,
+                mapping = None,
+                start = None,
+                attribute = None,
+                new_value = None):
+        """Perform various modifications on the 'atom_data'
+        dictionary.
 
         Parameters
         ----------
-        action : ``str``, {``"renumber"``, ``"rename"``}
-            The re-labeling action performed (either renumbering
-            or renaming).
+        action : ``str``, {``"keep"``, ``"remove"``, \
+            ``"rename"``, ``"renumber"``}
+            The modification to be performed on the 'atom_data'
+            dictionary:
 
-        item : ``str``
-            The type of item to be re-labeled.
+            - ``"keep"`` keeps only selected items.
+            - ``"remove"`` removes selected items.
+            - ``"rename"`` renames selected items, given a mapping
+              between the old names and the new names.
+            - ``"renumber"`` renumbers selected items, given a
+              new starting number.
+
+        elements_type : ``str``, {``"items"``, ``"attributes"``}
+            Whether the ``action`` at ``level`` needs to
+            be performed on items or attributes.
+
+        selected : ``dict``
+            A dictionary of models, chains, segments, residues, and
+            atoms considered during the modification, and which
+            values specific model, chain, segment, residue, or atom
+            attributes the items should have for them to be
+            considered.
+
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}, optional
+            At what level of the hierarchy the ``action``
+            should be performed, if ``action = "rename"``,
+            ``action = "assign"``, or ``action = "renumber"``.
 
         mapping : ``dict``, optional
-            A dictionary mapping the old labels to the new labels.
+            A dictionary mapping the old names to the new names,
+            when ``action = "rename"``.
 
         start : ``int``, optional
-            The new starting number for items whose IDs are either
-            integers (models) or contain integers (residues).
+            The new starting number, when ``action = "renumber"``.
 
         attribute : ``str``, optional
-            The name of the attribute that should be relabeled.
+            The name of the attribute to be renamed, if
+            ``action = "rename"`` and ``elements_type = "attributes"``.
 
-        models : ``list``, optional
-            A list of the models whose items will be affected by
-            the relabeling.
-
-        chains : ``list``, optional
-            A list of chains whose items will be affected by
-            the relabeling.
-
-        segments : ``list``, optional
-            A list of segments whose items will be affected by
-            the relabeling.
-        
-        residues : ``list``, optional
-            A list of residues whose items will be affected by
-            the relabeling.
-
-        residues_types : ``list``, optional
-            A list of residues' types. Items belonging to residues
-            of the selected types will be affected by the relabeling.
+        new_value : ``str``, ``int``, ``float``, ``tuple``, \
+            optional
+            The new value for the attribute, if ``action = "rename"``
+            and ``elements_type = "attributes"``. 
         """
+        
+
+        #------------------ Define helper functions ------------------#
+
+
+        # Keep only selected items
+        def _keep(struct,
+                  selected_items,
+                  selected_attrs,
+                  current_depth):
+
+            # If we are keeping models
+            if current_depth == 1:
+
+                # If no selected models were provided
+                if not selected_items:
+
+                    # Add models will be included
+                    selected_items = list(struct.keys())
+
+                # The items to check will be the entire structure
+                items_to_check = struct
+
+            # Otherwise
+            else:
+
+                # If no selected items were provided
+                if not selected_items:
+
+                    # All items will be included
+                    selected_items = list(struct["_items"].keys())
+                
+                # The items to check will be the ones in the
+                # '_items' dictioanary
+                items_to_check = struct["_items"]
+
+            #---------------------------------------------------------#
+
+            # Initialize an empty dictionary where the
+            # items that will be kept will be stored
+            kept_items = {}
+
+            #---------------------------------------------------------#
+            
+            # For each item and associated dictionary in the structure
+            for item, item_dict in items_to_check.items():
+
+                #-----------------------------------------------------#
+
+                # Initialize a flag for whether to keep the item
+                # to False (= by default, we do not keep the item)
+                to_keep = False
+
+                #-----------------------------------------------------#
+                
+                # If the item is a tuple (it is a residue)
+                if isinstance(item, tuple):
+
+                    # If the first element is in the selected items
+                    if item[0] in selected_items:
+
+                        # We will keep the item
+                        to_keep = True
+
+                    # If the third element is in the selected items
+                    if item[2] in selected_items:
+
+                        # We will keep the item
+                        to_keep = True
+
+                #-----------------------------------------------------#
+                
+                # If the item is in the selected ones
+                if item in selected_items:
+
+                    # We will keep the item
+                    to_keep = True
+
+                #-----------------------------------------------------#
+                
+                # For each item's attribute and the attribute's
+                # associated value
+                for attr_name, attr_value in \
+                    item_dict["_attributes"].items():
+
+                    # If the attribute is one of those selected,
+                    # and its value is not among the accepted values
+                    if attr_name in selected_attrs \
+                    and attr_value not in selected_attrs[attr_name]:
+                        
+                        # We will not keep the item
+                        to_keep = False
+
+                #-----------------------------------------------------#
+                
+                # If wee need to keep the item
+                if to_keep:
+
+                    # Add the item and associted dictionary
+                    # to the items to be kept
+                    kept_items[item] = item_dict
+
+            #---------------------------------------------------------#
+
+            # If we kept models
+            if current_depth == 1:
+
+                # Just return the dictionary
+                return kept_items
+
+            # Otherwise
+            else:
+                
+                # Return the items to be kept and the
+                # current structure's attributes
+                return {"_items" : kept_items,
+                        "_attributes" : \
+                            {k : v for k, v \
+                             in struct["_attributes"].items()}}
+
+
+        # Remove selected items
+        def _remove(struct,
+                    selected_items,
+                    selected_attrs,
+                    current_depth):
+
+            # If we are removing models
+            if current_depth == 1:
+
+                # The items to check for removal will be the entire
+                # structure
+                items_to_check = struct
+
+            # Otherwise
+            else:
+                
+                # The items to check for removal will be the ones in
+                # the '_items' dictioanary
+                items_to_check = struct["_items"]
+
+            # If no selected items were provided
+            if not selected_items:
+
+                # No items will be selected for removal
+                selected_items = {}
+
+            #---------------------------------------------------------#
+
+            # Initialize an empty dictionary where the items that
+            # will be kept will be stored
+            kept_items = {}
+
+            #---------------------------------------------------------#
+            
+            # For each item and associated dictionary in the structure
+            for item, item_dict in items_to_check.items():
+
+                # Initialize a flag for whether to keep the item
+                # to True (= by default, we keep the item)
+                to_keep = True
+
+                #-----------------------------------------------------#
+
+                # If the item is a tuple (it is a residue)
+                if isinstance(item, tuple):
+
+                    # If the first element is in the selected items
+                    if item[0] in selected_items:
+
+                        # We will remove the item
+                        to_keep = False
+
+                    # If the third element is in the selected items
+                    if item[2] in selected_items:
+
+                        # We will remove the item
+                        to_keep = False
+
+                #-----------------------------------------------------#
+                
+                # If the item is in the selected ones
+                if item in selected_items:
+
+                    # We will remove the item
+                    to_keep = False
+
+                #-----------------------------------------------------#
+                
+                # For each item's attribute and the attribute's
+                # associated value
+                for attr_name, attr_value \
+                in item_dict["_attributes"].items():
+
+                    # If the attribute is one of those selected,
+                    # and its value is among the accepted values
+                    if attr_name in selected_attrs \
+                    and attr_value in selected_attrs[attr_name]:
+
+                        # We will remove the item
+                        to_keep = False
+
+                #-----------------------------------------------------#
+                
+                # If wee need to keep the item
+                if to_keep:
+
+                    # Add the item and associated dictionary to the
+                    # items to be kept
+                    kept_items[item] = item_dict
+
+            #---------------------------------------------------------#
+
+            # If we removed models
+            if current_depth == 1:
+
+                # Just return the kept items
+                return kept_items
+
+            # Otherwise
+            else:
+
+                # Return the items to be kept and the current
+                # structure's attributes
+                return {"_items" : kept_items,
+                        "_attributes" : \
+                            {k : v for k, v \
+                             in struct["_attributes"].items()}}
+
+
+        # Rename selected items or assign a new value to one of
+        # their attributes
+        def _rename_or_assign(struct,
+                              selected_items,
+                              selected_attrs,
+                              mapping,
+                              elements_type,
+                              attribute,
+                              new_value,
+                              current_depth):
+
+            # If we are renaming models
+            if current_depth == 1:
+
+                # If no selected models were provided
+                if not selected_items:
+
+                    # Add models will be included in the renaming
+                    selected_items = list(struct.keys())
+
+                # The items to check will be the entire structure
+                items_to_check = struct
+
+            # If we are renaming chains, segments, residues,
+            # or atoms
+            else:
+
+                # If no selected items were provided
+                if not selected_items:
+
+                    # All items in the current structure will be
+                    # included in the renaming
+                    selected_items = list(struct["_items"].keys())
+                
+                # The items to check will be the ones in the
+                # '_items' dictioanary
+                items_to_check = struct["_items"]
+
+            #---------------------------------------------------------#
+
+            # Initialize an empty dictionary where the updated items
+            # will be stored - we do this instead of initializing a
+            # dictionary with all the items as they are and then
+            # renaming them on the go because by adding them
+            # (renamed or in their original form) one by one we
+            # ensure that we keep the original order
+            updated_items = {}
+
+            #---------------------------------------------------------#
+            
+            # For each item and associated dictionary
+            # in the current structure
+            for item, item_dict in items_to_check.items():
+
+                # Set a flag for whether to rename the item
+                to_rename = False
+
+                #-----------------------------------------------------#
+                
+                # If the item is a tuple (it is a residue)
+                if isinstance(item, tuple):
+
+                    # If the first element is in the selected items
+                    if item[0] in selected_items:
+
+                        # Set the flag to True
+                        to_rename = True
+
+                    # If the third element is in the selected items
+                    if item[2] in selected_items:
+
+                        # Set the flag to True
+                        to_rename = True
+
+                #-----------------------------------------------------#
+                
+                # If the item is in the selected ones
+                if item in selected_items:
+
+                    # Set the flag to True
+                    to_rename = True
+
+                #-----------------------------------------------------#
+                
+                # For each item's attribute and the attribute's
+                # associated value
+                for attr_name, attr_value \
+                in item_dict["_attributes"].items():
+
+                    # If the attribute is one of those selected,
+                    # and its value is among the accepted values
+                    if attr_name in selected_attrs \
+                    and attr_value in selected_attrs[attr_name]:
+                        
+                        # Set the flag to True
+                        to_rename = True
+
+                #-----------------------------------------------------#
+
+                # If the 'to_rename' flag is False
+                if not to_rename:
+
+                    # Add the item as it is
+                    updated_items[item] = item_dict
+
+                    # Go to the next item
+                    continue
+
+                #-----------------------------------------------------#
+
+                # If we are renaming an attribute
+                if elements_type == "attributes":
+
+                    # Initialize the dictionary of updated attributes
+                    # as the current dictionary of attributes
+                    # (= not renamed)
+                    updated_attrs = item_dict["_attributes"]
+
+                    # If we have the attribute in the current item
+                    if attribute in updated_attrs:
+
+                        # Update the attribute's value
+                        updated_attrs[attribute] = new_value
+
+                    # Update the attribute in the item's dictionary
+                    item_dict["_attributes"] = updated_attrs
+
+                    # Add the item to the list of updated items
+                    updated_items[item] = item_dict
+                    
+                    # Go to the next item
+                    continue
+
+                #-----------------------------------------------------#
+                
+                # If the item is a tuple (it is a residue)
+                if isinstance(item, tuple):
+
+                    # If the first element is in the mapping
+                    if item[0] in mapping:
+
+                        # Assemble the new item
+                        new_item = (mapping[item[0]], item[1], item[2])
+
+                        # Rename the item and add it to the dictionary
+                        updated_items[new_item] = item_dict
+
+                        # Go to the next item (we need to continue
+                        # because, if we do not do it and the residue's
+                        # name matches one of those provided or the
+                        # entire ID of the residue matches one of those
+                        # provided, we are going to add the residue
+                        # twice)
+                        continue
+
+                    # If the third element is in the mapping
+                    if item[2] in mapping:
+
+                        # Assemble the new item
+                        new_item = (item[0], item[1], mapping[item[2]])
+
+                        # Rename the item and add it to the dictionary
+                        updated_items[new_item] = item_dict
+
+                        # Go to the next item (we need to continue
+                        # because, if we do not do it and the residue's
+                        # number matches one of those provided or the
+                        # entire ID of the residue matches one of those
+                        # provided, we are going to add the residue
+                        # twice)
+                        continue
+
+                #-----------------------------------------------------#
+
+                # If the entire element is in the mapping
+                if item in mapping:
+                    
+                    # Rename the item and add it to the dictionary
+                    updated_items[mapping[item]] = item_dict
+
+                    # Go to the next item
+                    continue
+
+                #-----------------------------------------------------#
+
+                # Add the item as it is
+                updated_items[item] = item_dict
+
+            #---------------------------------------------------------#
+
+            # If we renamed models
+            if current_depth == 1:
+
+                # Just return the updated dictionary
+                return updated_items
+            
+            # Otherwise
+            else:
+                
+                # Return the items to be renamed and the current
+                # structure's attributes
+                return {"_items" : updated_items,
+                        "_attributes" : \
+                            {k : v for k, v \
+                             in struct["_attributes"].items()}}
+
+
+        # Renumber items
+        def _renumber(struct,
+                      start,
+                      current_depth):
+
+            # If we are checking models
+            if current_depth == 1:
+
+                # The items to check will be the entire structure
+                items_to_check = struct
+
+            # Otherwise
+            else:
+                
+                # The items to check will be the ones in the
+                # '_items' dictioanary
+                items_to_check = struct["_items"]
+
+            #---------------------------------------------------------#
+
+            # Initialize an empty dictionary where the
+            # updated items will be stored
+            updated_items = {}
+
+            # Initialize the new starting number from the one
+            # provided
+            new_start = start
+
+            #---------------------------------------------------------#
+            
+            # For each item and associated dictionary
+            # in the current structure
+            for item, item_dict in items_to_check.items():
+
+                # If the item is a tuple (it is a residue)
+                if isinstance(item, tuple):
+
+                    # Assemble the new item
+                    new_item = (new_start, item[1], item[2])
+
+                    # Renumber the item and add it to the dictionary
+                    updated_items[new_item] = item_dict
+
+                # Otherwise
+                else:
+
+                    # Renumber the item and add it to the dictionary
+                    updated_items[new_start] = item_dict
+
+                # Update the starting number
+                new_start += 1
+
+            #---------------------------------------------------------#
+
+            # If we renumbered models
+            if current_depth == 1:
+
+                # Just return the dictionary
+                return updated_items
+
+            # Otherwise
+            else:
+
+                # Return the renumbered items and the current
+                # structure's attributes
+                return {"_items" : updated_items,
+                        "_attributes" : \
+                            {k : v for k, v \
+                             in struct["_attributes"].items()}}
 
 
         #------------------- Define the recursion --------------------#
 
 
         def recursive_step(struct,
+                           action,
+                           elements_type,
+                           selected,
                            target_depth,
-                           attribute,
-                           mapping, 
-                           start,
-                           models,
-                           chains,
-                           segments,
-                           residues,
-                           residues_types,
-                           current_depth = 1):
+                           mapping = None,
+                           start = None,
+                           attribute = None,
+                           new_value = None,
+                           current_depth = 1,
+                           should_recurse = True):
 
             # If we are at the target depth
             if current_depth == target_depth:
 
-                # If we are assigning a new value to a specific
-                # attribute
-                if attribute is not None:
-
-                    # Get the current value of the attribute
-                    value = struct[attribute]
-
-                    # If the value is included in the mapping
-                    # provided
-                    if value in mapping:
-
-                        # Substitute the value with the corresponding
-                        # one found in the mapping
-                        struct[attribute] = mapping[value]
-
-                    # Return the current sub-structure
-                    return struct
-
-                # If we are substituting the identifiers (and not
-                # specific attributes)
-                else:
-            
-                    # If a starting number was passed
-                    if start is not None:
+                # If the target depth is the models' depth
+                if current_depth == 1:
                     
-                        # Renumber the keys in the current
-                        # sub-structure, taking care of the
-                        # identifiers that are tuples
-                        # (= residue idenfitiers)
-                        return {((i, old_key[1]) \
-                                  if isinstance(old_key, tuple) \
-                                  else i) : struct[old_key]  \
-                                for i, old_key \
-                                in enumerate(struct, start)}
+                    # The depth of the items we are checking
+                    # is only one level down
+                    items_depth = current_depth + 1
+                
+                else:
+                    
+                    # The depth of the items we are checking
+                    # is teo level down
+                    items_depth = current_depth + 2
 
-                    # If a mapping was passed
-                    elif mapping is not None:
+                # Get the user-selected items
+                selected_items = \
+                    selected[self._ITEMSATTRS_DEPTH_TO_LEVELS[\
+                        items_depth]]["_items"]
 
-                        # Create an empty dictionary to store
-                        # the updated sub-structure
-                        new_struct = {}
+                # Get the user-selected attributes
+                selected_attrs = \
+                    selected[self._ITEMSATTRS_DEPTH_TO_LEVELS[\
+                        items_depth]]["_attributes"]
 
-                        # For each key in the current sub-structure
-                        for old_key in struct:
+                #-----------------------------------------------------#
 
-                            # By default, the key in the updated
-                            # sub-structure will be the same as
-                            # in the old sub-structure
-                            new_key = old_key
+                # If we are keeping the selected items
+                if action == "keep":
 
-                            # If the old key is a tuple (= residue
-                            # identifier)
-                            if isinstance(old_key, tuple):
+                    # Keep the items and return the result
+                    return _keep(struct = struct,
+                                 selected_items = selected_items,
+                                 selected_attrs = selected_attrs,
+                                 current_depth = current_depth)
+                
+                #-----------------------------------------------------#
 
-                                # If the first element of the tuple
-                                # (= the residue's sequence number)
-                                # is in the mapping
-                                if old_key[0] in mapping:
+                # If we are removing the selected items
+                elif action == "remove":
 
-                                    # Create the key for the updated
-                                    # sub-structure
-                                    new_key = \
-                                        (mapping[old_key[0]],
-                                         old_key[1])
+                    # Remove the items and return the result
+                    return _remove(struct = struct,
+                                   selected_items = selected_items,
+                                   selected_attrs = selected_attrs,
+                                   current_depth = current_depth)
+
+                #-----------------------------------------------------#
+
+                # If we are renaming the selected items or assigning
+                # a new value to one of their attributes
+                elif action in ("rename", "assign"):
+
+                    # Rename the items and return the result
+                    return _rename_or_assign(\
+                                struct = struct,
+                                selected_items = selected_items,
+                                selected_attrs = selected_attrs,
+                                mapping = mapping,
+                                elements_type = elements_type,
+                                attribute = attribute,
+                                new_value = new_value,
+                                current_depth = current_depth)
+
+                #-----------------------------------------------------#
+
+                # If we are renumbering the selected items
+                elif action == "renumber":
+
+                    # Renumber the items and return the result
+                    return _renumber(struct = struct,
+                                     start = start,
+                                     current_depth = current_depth)
+
+            #---------------------------------------------------------#
+
+            # If we are not at the target depth yet
+            else:
+
+                # If we are at a level containing items
+                if current_depth in self._IDS_DEPTH_TO_LEVELS:
+
+                    # For each key and associated sub-structure
+                    # in the current structure
+                    for key, sub_struct in list(struct.items()):
+
+                        # Get whether we should recurse through the
+                        # structure or not
+                        should_recurse = \
+                            self._should_recurse(\
+                                key = key,
+                                value = sub_struct,
+                                selected = selected,
+                                current_depth = current_depth)
+
+                        # If we should recurse
+                        if should_recurse:
+                            
+                            # Recursively traverse the sub-structure
+                            # and get the resulting dictionary
+                            new_sub_struct = \
+                                recursive_step(\
+                                    struct = sub_struct,
+                                    action = action,
+                                    elements_type = elements_type,
+                                    selected = selected,
+                                    target_depth = target_depth,
+                                    mapping = mapping,
+                                    start = start,
+                                    attribute = attribute,
+                                    new_value = new_value,
+                                    current_depth = current_depth + 1,
+                                    should_recurse = should_recurse)
+
+                            # If the dictionary does not contain any
+                            # items
+                            if new_sub_struct["_items"] == {}:
+
+                                # Remove the sub-structure from
+                                # the dictionary
+                                struct.pop(key)
 
                             # Otherwise
                             else:
 
-                                # If the entire old key is in the
-                                # mapping
-                                if old_key in mapping:
+                                # Substitute the sub-structure
+                                # with the new one
+                                struct[key] = new_sub_struct
 
-                                    # Create the key for the updated
-                                    # sub-structure
-                                    new_key = mapping[old_key]
+                        # If we should not recurse and the action
+                        # to be performed is 'keep'
+                        elif not should_recurse and action == "keep":
 
-                            # Add the key and the associated value
-                            # to the updated struture
-                            new_struct[new_key] = struct[old_key]
+                            # Remove the sub-structure from
+                            # the dictionary (= ignored sub-structures
+                            # are sub-structures to be removed if
+                            # the action is 'keep')
+                            struct.pop(key)
 
-                        # Sort the updated structure
-                        new_struct = \
-                            {key : new_struct[key] for key in \
-                             sorted(new_struct)}
+                #-----------------------------------------------------#
 
-                        # Return the updated structure
-                        return new_struct  
+                # If we are at a ['_items', '_attributes'] depth
+                else:
 
-            # If we have not reached the target depth yet, for
-            # each key and associated sub-structure in the current
-            # sub-structure
-            for key, sub_struct in struct.items():
+                    # For each key and associated sub-structure in
+                    # the current structure
+                    for key, sub_struct in struct.items():
 
-                # Set the flag to decide whether we should
-                # recurse to True (= by default, recurse)
-                should_recurse = True
-                
-                # If:
-                # - a list of models was specified
-                # - AND we have reached the models' level
-                # - AND we are not at any of the selected models
-                if models is not None and current_depth == 1 \
-                and key not in models:
+                        # If we are at the '_items'
+                        if key == "_items":
 
-                    # Do not recurse
-                    should_recurse = False
-                
-                # If:
-                # - a list of chains was specified
-                # - AND we have reached the chains' level
-                # - AND we are not at any of the selected chains
-                if chains is not None and current_depth == 2 \
-                and key not in chains:
+                            # Recursively traverse the sub-structure
+                            # and substitute it in the structure
+                            # with the resulting sub-structure
+                            struct[key] = \
+                                recursive_step(\
+                                    struct = sub_struct,
+                                    action = action,
+                                    elements_type = elements_type,
+                                    selected = selected,
+                                    target_depth = target_depth,
+                                    mapping = mapping,
+                                    start = start,
+                                    attribute = attribute,
+                                    new_value = new_value,
+                                    current_depth = current_depth + 1,
+                                    should_recurse = should_recurse)
 
-                    # Do not recurse
-                    should_recurse = False
-                
-                # If:
-                # - a set of segments was specified
-                # - AND we have reached the segments' level
-                # - AND we are not at any of the selected segments
-                if segments is not None and current_depth == 3 \
-                and key not in segments:
+                        # We ignore the '_attributes' key
 
-                    # Do not recurse
-                    should_recurse = False
-                
-                # If:
-                # - a list of residue was specified
-                # - AND and we have reached the residues' level
-                if residues is not None and current_depth == 4:
+            #---------------------------------------------------------#
 
-                    # If neither the full residue ID (sequence
-                    # number and insertion code) or the residue's
-                    # sequence number are in the set of selected
-                    # residues
-                    if key not in residues and key[0] not in residues:
-
-                        # Do not recurse
-                        should_recurse = False
-                
-                # If:
-                # - a list of residue types was specified
-                # - AND we have reached the inner residues'
-                #   attributes' level
-                # - AND and the current residue is not of a type
-                #   of interest
-                if residues_types is not None and current_depth == 5 \
-                and struct["res_name"] in residues_types:
-
-                    # Do not recurse
-                    should_recurse = True
-
-                # If we should recurse and the current sub-structure
-                # is a dictionary
-                if should_recurse and isinstance(sub_struct, dict):
-
-                    # Recurse over the sub-structure, substituting
-                    # the sub-structure associated to the current key
-                    # with the result of the recursion
-                    struct[key] = \
-                        recursive_step(\
-                            struct = sub_struct,
-                            target_depth = target_depth,
-                            attribute = attribute,
-                            mapping = mapping,
-                            start = start,
-                            models = models,
-                            chains = chains,
-                            segments = segments,
-                            residues = residues,
-                            residues_types = residues_types,
-                            current_depth = current_depth + 1)
-
-            # Return the updated structure
+            # Return the structure
             return struct
 
+
+        #--------------------- Get target depth ----------------------#
+
+
+        # If no 'level' was passed
+        if level is None:
+
+            # Get the hierarchy of the the selected items/attributes,
+            # setting 'None' for levels where no items/attributes
+            # were selected
+            selected_list = \
+                [k if v["_items"] or v["_attributes"] \
+                 else None for k, v in selected.items()]
+
+            # Get the target level from the last not-None element
+            # of the reversed hierarchy
+            level = \
+                next((i for i in reversed(selected_list) \
+                      if i is not None))
+
+        # From the mapping between depths and corresponding items
+        # and the index of our target in the list, get the target
+        # depth for our recursion
+        target_depth = \
+            {v : k for k, v \
+             in self._ITEMSATTRS_DEPTH_TO_LEVELS.items()}[level] - 2
+
+        # If we ended up with a target depth of 0
+        if target_depth == 0:
+
+            # Set it to 1 since we are operating on models
+            target_depth = 1
 
         #--------------------------- Check ---------------------------#
 
 
-        # If both 'start' and 'mapping' were specified
-        if start is not None and mapping is not None:
-
-            # Raise an error
-            errstr = \
-                "'start' and 'mapping' are mutually exclusive " \
-                "options."
-            raise ValueError(errstr)
-
-        # If a starting number was specified
-        if start is not None:
+        # If we have to renumber the items
+        if action == "renumber":
 
             # If the starting number is not an integer
             if not isinstance(start, int):
@@ -997,16 +2640,16 @@ class Structure:
 
             # If a starting number was specified for something
             # other than models or residues
-            if item not in ("model", "residue"):
+            if level not in ("models", "residues"):
 
                 # Raise an error
                 errstr = \
-                    "'start' can only be used for re-numbering " \
-                    "models and residues."
+                    "'renumber' can only be used for models " \
+                    "and residues."
                 raise ValueError(errstr)
 
-        # If a mapping was specified
-        if mapping is not None:
+        # If we have to rename the items
+        elif action == "rename":
 
             # If the mapping is not a dictionary
             if not isinstance(mapping, dict):
@@ -1015,409 +2658,56 @@ class Structure:
                 errstr = "'mapping' must be a dictionary."
                 raise TypeError(errstr)
 
-            # If we are renumbering with the mapping
-            if action == "renumber":
+        # If we have to assign a new value to an attribute
+        elif action == "assign":
 
-                # Get the values in the mapping as a list and
-                # as a set
-                values = list(mapping.values())
-                values_set = set(mapping.values())
+            # If the attribute's name is not a string
+            if not isinstance(attribute, str):
 
-                # If they are not unique
-                if len(values_set) < len(values):
+                # Raise an error
+                errstr = "'attribute' must be a string."
+                raise TypeError(errstr)
 
-                    # Raise an error
-                    errstr = \
-                        "When renumbering, both keys and values " \
-                        "in 'mapping' must be unique."
-                    raise ValueError(errstr)
+            # If the attribute's new value is not an integer,
+            # float, string, or tuple
+            if not isinstance(new_value, (int, float, str, tuple)):
 
+                # Raise an error
+                errstr = \
+                    "'new_value' must be an integer, floating-point " \
+                    "number, string, or tuple."
+                raise TypeError(errstr)
 
-        #------------------------- Re-label --------------------------#
+        #-------------------------- Modify ---------------------------#
 
-
-        # Get the target depth from the type of items to be re-labeled
-        target_depth = self._ITEM2DEPTH[item]
-
-        # Recurse and update the structure's atomic coordinates
-        # (we need to pass a copy of the 'atom_data' dictionary
-        # beecause it will be modified by the recursion)
-        self._atom_data = \
-            recursive_step(struct = copy.deepcopy(self.atom_data),
-                           target_depth = target_depth,
-                           start = start,
-                           mapping = mapping,
-                           attribute = attribute,
-                           models = models,
-                           chains = chains,
-                           segments = segments,
-                           residues = residues,
-                           residues_types = residues_types)
-
-
-    def _renumber_atoms(self,
-                        start = 1):
-        """Renumber the atoms in the structure so that each model's
-        atom numbering starts from 'start', and each chain's atom
-        numbering starts from the number of the atom ending the
-        previous chains plus 2 (to accommodate the TER record at
-        the end of a chain).
-
-        Parameters
-        ----------
-        start : ``int``, ``1``
-            The new starting number for the atoms' serial numbers.
-        """
-
-
-        #------------------- Define the recursion --------------------#
-
-
-        def recursive_step(struct,
-                           current_atom_count,
-                           current_depth = 1,
-                           current_path = (),
-                           oldnum2newnum = None):
-
-            # If no mapping has been created yet between the
-            # old numbering and the new numbering, create an
-            # empty dictionary that will contain the mapping (this
-            # mapping will be created only once when we are
-            # traversing the dictionary representing the first
-            # model, and then updated, since the mapping will
-            # be None only at the very beginning)
-            if oldnum2newnum is None:
-
-                # Create a mapping that will contain, for each
-                # model, the old atom numbering mapped to
-                # the new atom numbering
-                oldnum2newnum = {mod : {} for mod in struct}
-            
-            # If we have reached the atoms' level
-            if current_depth == 6:
-
-                # Set the default starting number for the current
-                # set of atoms
-                start_num = current_atom_count + 1
-
-                # Renumber the atoms
-                atoms_renumbered = \
-                    {atom_rel_index + start_num : atom_data \
-                     for atom_rel_index, atom_data \
-                     in enumerate(struct.values())}
-                
-                # Update the atoms' count for the current model
-                # with the atoms of the current set
-                current_atom_count = \
-                    start_num + len(struct) - 1
-
-                # Update the mapping between the old numbering
-                # and the new numbering with the mapping for
-                # the current set of atoms
-                oldnum2newnum[current_path[0]].update(\
-                    {atom_old_num : atom_rel_index + start_num \
-                     for atom_rel_index, (atom_old_num, _) \
-                     in enumerate(struct.items())})
-                
-                # Return the renumbered atoms, the current
-                # atom count, and the updated mapping
-                return atoms_renumbered, \
-                       current_atom_count, \
-                       oldnum2newnum
-
-            # If we have not reached the atoms yet
-            else:
-                
-                # Get the previous model
-                prev_model = \
-                    current_path[0] if len(current_path) > 0 else None
-                
-                # Get the previous chain
-                prev_chain = \
-                    current_path[1] if len(current_path) > 1 else None
-                
-                # For each key and associated sub-structure in the
-                # current sub-structure
-                for key, sub_struct in struct.items():
-                    
-                    # If the sub-structure is a dictionary
-                    if isinstance(sub_struct, dict):
-                        
-                        # If we are in a new model
-                        if current_depth == 1 and key != prev_model:
-                            
-                            # Reset the count for the atoms
-                            current_atom_count = -1
-                        
-                        # If we are in a new chain
-                        elif current_depth == 2 and key != prev_chain:
-                            
-                            # Carry over the previous count plus 1
-                            current_atom_count += 1
-
-                        # Recursively process the sub-structure
-                        struct[key], current_atom_count, oldnum2newnum = \
-                            recursive_step(\
-                                struct = sub_struct,
-                                current_atom_count = current_atom_count,
-                                current_depth = current_depth + 1,
-                                current_path = current_path + (key,),
-                                oldnum2newnum = oldnum2newnum)
-                
-                # Return the structure, the current atom count,
-                # and the mapping between the old and the new
-                # numbering
-                return struct, current_atom_count, oldnum2newnum
-
-
-        #------------------------- Renumber --------------------------#
-
-
-        # Get the updated data for the atoms and the mapping
-        # between the old numbering and the new numbering (we need
-        # to pass a copy of the 'atom_data' dictionary because it
-        # will be modified by the recursion)
-        atom_data_updated, _, oldnum2newnum = \
-            recursive_step(struct = copy.deepcopy(self.atom_data),
-                           current_atom_count = start - 2)
-
-        # Update the data for the atoms
-        self._atom_data = atom_data_updated
-
-
-        #-------------------- Update CONECT data ---------------------#
-
-
-        # Update the CONECT data associated with the structure
-        self._update_conect_data(mapping = oldnum2newnum)
-
-
-    def _keep_or_remove(self,
-                        action,
-                        items,
-                        items_type,
-                        models = None,
-                        chains = None,
-                        segments = None,
-                        residues = None):
-        """Keep or remove models, chains, segments, residues, or atoms.
-
-        Parameters
-        ----------
-        action : ``str``, {``"keep"``, ``"remove"``}
-            Whether to keep or remove the selected items.
-
-        items : ``list``
-            The list of items to be kept/removed.
-
-        items_type : ``str``
-            The type of items to be kept/removed.
-
-        models : ``list``, optional
-            The models to be considered when keeping/removing
-            the items.
-
-            If not provided, all models will be considered.
-
-        chains : ``list``, optional
-            The chains to be considered when keeping/removing
-            the items.
-
-            If not provided, all chains will be considered.
-
-        segments : ``list``, optional
-            The segments to be considered when keeping/removing
-            the items.
-
-            If not provided, all segments will be considered.
-
-        residues : ``list``, optional
-            The residues to be considered when keeping/removing
-            the items.
-
-            If not provided, all residues will be considered.
-        """
         
-
-        #------------------- Define the recursion --------------------#
-
-
-        def recursive_step(struct,
-                           action,
-                           items,
-                           target_depth,
-                           models,
-                           chains,
-                           segments,
-                           residues,
-                           current_depth = 1):
-            
-            # If we are at the target depth
-            if current_depth == target_depth:
-
-                # If we have to keep only the selected items
-                if action == "keep":
-
-                    # Return the current sub-structure with the
-                    # items to be kept (deal also with the case of
-                    # residues, where you have a tuple representing
-                    # the item but the user may have passed only the
-                    # sequence number or a residue name)
-                    return {k : v for k, v in struct.items() \
-                            if (isinstance(k, tuple) \
-                                and (k[0] in items \
-                                or v["res_name"] in items)) \
-                            or (not isinstance(k, tuple) \
-                                and k in items)}
-
-                # If we have to remove the selected items
-                elif action == "remove":
-
-                    # Return the current sub-structure without the
-                    # items to be removed (deal also with the case of
-                    # residues, where you have a tuple representing
-                    # the item but the user may have passed only the
-                    # sequence number or a residue name)
-                    return {k : v for k, v in struct.items() \
-                            if (isinstance(k, tuple) \
-                                and (k[0] not in items \
-                                and v["res_name"] not in items)) \
-                            or (not isinstance(k, tuple) \
-                                and k not in items)}
-
-            # For each key and associated sub-structure in the
-            # current sub-structure
-            for key, sub_struct in list(struct.items()):
-                
-                # If the sub-structure is a dictionary
-                if isinstance(sub_struct, dict):
-
-                    # Evaluate the condition for whether this is
-                    # the right model (we are at the right depth
-                    # and either the user did not select any models
-                    # or the current model is among the selected
-                    # ones)
-                    is_right_model = \
-                        current_depth == 1 and \
-                        (models is None or key in models)
-
-                    # Evaluate the condition for whether this is
-                    # the right chain (we are at the right depth
-                    # and either the user did not select any chains
-                    # or the current chain is among the selected
-                    # ones)
-                    is_right_chain = \
-                        current_depth == 2 and \
-                        (chains is None or key in chains)
-
-                    # Evaluate the condition for whether this is
-                    # the right segment (we are at the right depth
-                    # and either the user did not select any segments
-                    # or the current segment is among the selected
-                    # ones)
-                    is_right_segment = \
-                        current_depth == 3 and \
-                        (segments is None or key in segments)
-
-                    # Evaluate the condition for whether this is
-                    # the right residue (we are at the right depth
-                    # and either the user did not select any residues
-                    # or the current residue is among the selected
-                    # ones)
-                    is_right_residue = \
-                        current_depth == 4 and \
-                        (residues is None or key in residues)
-
-                    # If the conditions for model, chain, segment,
-                    # or residue are met
-                    if is_right_model or is_right_chain \
-                        or is_right_segment or is_right_residue:
-
-                        # If we are at the residues' level
-                        if current_depth == 4:
-
-                            # Let's skip the residues' attributes'
-                            # level at the next recursion
-                            struct[key]["atoms"] = \
-                                recursive_step(\
-                                    struct = sub_struct["atoms"],
-                                    action = action,
-                                    items = items,
-                                    target_depth = target_depth,
-                                    models = models,
-                                    chains = chains,
-                                    segments = segments,
-                                    residues = residues,
-                                    current_depth = current_depth + 2)
-
-                            # If the residue is empty after having
-                            # removed the atoms
-                            if not struct[key]["atoms"]:
-
-                                # Remove the residue
-                                struct.pop(key)
-
-                        # Otherwise
-                        else:
-
-                            # Let's go to the level right below
-                            struct[key] = \
-                                recursive_step(\
-                                    struct = sub_struct,
-                                    action = action,
-                                    items = items,
-                                    target_depth = target_depth,
-                                    models = models,
-                                    chains = chains,
-                                    segments = segments,
-                                    residues = residues,
-                                    current_depth = current_depth + 1)
-
-                            # If the container is empty after having
-                            # removed the items
-                            if not struct[key]:
-
-                                # Remove the container
-                                struct.pop(key)
-
-            # Return the updated structure
-            return struct
-
-
-        #------------------- Keep/remove the items -------------------#
-
-
-        # Get the target depth corresponding to the items to
-        # be kept or removed
-        target_depth = self._ITEM2DEPTH[items_type]
-
-        # Keep or remove the items (we need to pass a copy of the
-        # 'atom_data' attribute because it will be modified by the
-        # recursion)
+        # Recursively modify the structure
         self._atom_data = \
             recursive_step(struct = copy.deepcopy(self.atom_data),
                            action = action,
-                           items = items,
+                           elements_type = elements_type,
+                           selected = selected,
                            target_depth = target_depth,
-                           models = models,
-                           chains = chains,
-                           segments = segments,
-                           residues = residues)
+                           mapping = mapping,
+                           start = start,
+                           attribute = attribute,
+                           new_value = new_value)
+
+        #---------------------- Renumber atoms -----------------------#
 
 
-        #-------------------- Renumber the atoms ---------------------#
-
-
-        # Renumber the atoms (it also updates the CONECT data)
+        # Renumber the atoms (it also updates the connectivity data)
         self._renumber_atoms()
 
 
     def _move_atoms(self,
                     atoms,
-                    create_new_struct,
                     new_chain,
+                    new_chain_attributes,
                     new_segment,
+                    new_segment_attributes,
                     new_residue,
+                    new_residue_attributes,
                     in_place):
         """Move atoms to another part of the structure or to a new
         structure.
@@ -1427,20 +2717,28 @@ class Structure:
         atoms : ``list``
             The atoms to be moved.
 
-        create_new_struct : ``bool``
-            Whether a new structure should be created to store the
-            atoms.
-
         new_chain : ``str``
             The identifier of the chain where the atoms should
+            be moved.
+
+        new_chain_attributes : ``dict``
+            The attributes of the chain where the atoms should
             be moved.
 
         new_segment : ``str``
             The identifier of the segment where the atoms should
             be moved.
 
+        new_segment_attributes : ``dict``
+            The attributes of the segment where the atoms should
+            be moved.
+
         new_residue : ``tuple``
             The identifier of the residue where the atoms should
+            be moved.
+
+        new_residue_attributes : ``dict``
+            The attributes of the residue where the atoms should
             be moved.
 
         in_place : ``bool``, ``False``
@@ -1449,33 +2747,39 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place = False``,
-        ``None`` otherwise.
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
         """
 
 
         #------------------- Define the recursion --------------------#
 
 
-        def recursive_step(struct_iter,
-                           struct_add,
-                           struct_remove,
-                           atoms,
-                           new_chain,
-                           new_segment,
-                           new_residue,
+        def recursive_step(struct_iter = None,
+                           struct_add = None,
+                           struct_remove = None,
+                           atoms = None,
+                           new_chain = None,
+                           new_chain_attributes = None,
+                           new_segment = None,
+                           new_segment_attributes = None,
+                           new_residue = None,
+                           new_residue_attributes = None,
                            current_depth = 1,
                            current_path = ()):
             
-            # If we have reached the atoms' level (it is at depth
-            # 5 in this case because we 'skipped' a level when
-            # defining the sub-structure to recurse through at
-            # depth 4)
-            if current_depth == 5:
+            # If we have reached the atoms' level
+            if current_depth == 9:
 
                 # Get the model, chain, segment, and residue
                 # the atoms belong to
-                model, chain, segment, residue = current_path
+                (model, model_attributes), \
+                (chain, chain_attributes), \
+                (segment, segment_attributes), \
+                (residue, residue_attributes) = \
+                    current_path
+
+                #-----------------------------------------------------#
 
                 # For each atom in the current residue
                 for atom_serial in struct_iter:
@@ -1490,6 +2794,13 @@ class Structure:
                             # chain
                             new_chain = chain
 
+                            # The chain's attributes will be
+                            # the same
+                            new_chain_attributes = \
+                                chain_attributes
+
+                        #---------------------------------------------#
+
                         # If no new segment was specified
                         if new_segment is None:
 
@@ -1497,183 +2808,293 @@ class Structure:
                             # segment
                             new_segment = segment
 
+                            # The segment's attributes will be
+                            # the same
+                            new_segment_attributes = \
+                                segment_attributes
+
+                        #---------------------------------------------#
+
                         # If no new residue was specified
                         if new_residue is None:
 
                             # The atom will stay on the current
                             # residue
-                            new_residue_seq = residue
+                            new_residue = residue
 
-                            # The residue name will be the one
-                            # of the current residue
-                            new_residue_name = \
-                                struct_remove[model][chain][\
-                                    segment][residue]["res_name"]
+                            # The residue's attributes will be
+                            # the same
+                            new_residue_attributes = \
+                                residue_attributes
 
-                        # Otherwise
-                        else:
-
-                            # Separate the residue's sequence number
-                            # and insertion code from the residue's
-                            # name
-                            new_residue_seq, new_residue_name = \
-                                new_residue[:2], new_residue[2]
+                        #---------------------------------------------#
                         
                         # In the structure to which the atoms should
                         # be added, add a new model with the ID
                         # of current model, if necessary
                         struct_add.setdefault(\
                             model,
-                            {})
+                            {"_items" : {},
+                             "_attributes" : \
+                                model_attributes})
+
+                        #---------------------------------------------#
                         
                         # In the structure to which the atoms should
                         # be added, add a new chain with the
                         # specified ID, if necessary
-                        struct_add[model].setdefault(\
+                        struct_add[model]["_items"].setdefault(\
                             new_chain,
-                            {})
+                            {"_items" : {},
+                             "_attributes" : \
+                                new_chain_attributes})
+
+                        #---------------------------------------------#
 
                         # In the structure to which the atoms should
                         # be added, add a new segment with the
                         # specified ID, if necessary
-                        struct_add[model][new_chain].setdefault(\
-                            new_segment,
-                            {})
+                        struct_add[model]["_items"][new_chain][\
+                            "_items"].setdefault(\
+                                new_segment,
+                                {"_items" : {},
+                                 "_attributes" : \
+                                    new_segment_attributes})
+
+                        #---------------------------------------------#
 
                         # In the structure to which the atoms should
                         # be added, add a new residue with the
                         # specified ID and name, if necessary
-                        struct_add[model][new_chain][\
-                            new_segment].setdefault(\
-                                new_residue_seq, 
-                                {"res_name" : new_residue_name,
-                                 "atoms": {}})
+                        struct_add[model]["_items"][new_chain][\
+                            "_items"][new_segment][\
+                                "_items"].setdefault(\
+                                    new_residue, 
+                                    {"_items" : {},
+                                     "_attributes" : \
+                                        new_residue_attributes})
+
+                        #---------------------------------------------#
                         
                         # In the structure to which the atoms should
                         # be added, add the current atom
-                        struct_add[model][new_chain][\
-                            new_segment][new_residue_seq][\
-                                "atoms"][atom_serial] = \
+                        struct_add[model]["_items"][new_chain][\
+                            "_items"][new_segment]["_items"][\
+                                new_residue]["_items"][atom_serial] = \
                                     struct_iter[atom_serial]
+
+                        #---------------------------------------------#
 
                         # Remove the atom from the structure from
                         # which the atoms should be removed
-                        del struct_remove[model][chain][\
-                                segment][residue]["atoms"][\
+                        del struct_remove[model]["_items"][\
+                            chain]["_items"][segment]["_items"][\
+                                residue]["_items"][\
                                     atom_serial]
 
-                # If removing the atoms resulted in an empty residue
-                if not struct_remove[model][chain][\
-                    segment][residue]["atoms"]:
+                #-----------------------------------------------------#
+
+                # Get the residues left in the segment
+                residues_left = \
+                    struct_remove[model]["_items"][chain][\
+                        "_items"][segment]["_items"]
+
+                # If the current residue is in the segment and 
+                # removing the atoms resulted in an empty residue
+                if residue in residues_left \
+                and not residues_left[residue]["_items"]:
 
                     # Remove the residue
-                    del struct_remove[model][chain][segment][residue]
+                    del struct_remove[model]["_items"][chain][\
+                        "_items"][segment]["_items"][residue]
 
-                # If removing the atoms resulted in an empty segment
-                if not struct_remove[model][chain][segment]:
+                #-----------------------------------------------------#
+
+                # Get the segments left in the chain
+                segments_left = \
+                    struct_remove[model]["_items"][chain]["_items"]
+
+                # If the current segment is in the chain and
+                # removing the residues resulted in an empty
+                # segment
+                if segment in segments_left \
+                and not segments_left[segment]["_items"]:
 
                     # Remove the segment
-                    del struct_remove[model][chain][segment]
+                    del struct_remove[model]["_items"][chain][\
+                        "_items"][segment]
+
+                #-----------------------------------------------------#
+
+                # Get the chains left in the model
+                chains_left = struct_remove[model]["_items"]
 
                 # If removing the atoms resulted in an empty chain
-                if not struct_remove[model][chain]:
+                if chain in chains_left \
+                and not chains_left[chain]["_items"]:
 
                     # Remove the chain
-                    del struct_remove[model][chain]
+                    del struct_remove[model]["_items"][chain]
+
+                #-----------------------------------------------------#
+
+                # Get the models left
+                models_left = struct_remove.keys()
 
                 # If removing the atoms resulted in an empty model
-                if not struct_remove[model]:
+                if model in models_left \
+                and not struct_remove[model]["_items"]:
 
                     # Remove the model
                     del struct_remove[model]
+
+            #---------------------------------------------------------#
             
             # If we have not reached the atoms' level
             else:
 
+                # Set the arguments that will be used in
+                # the recursion no matter what
+                recurse_args = \
+                    {"struct_add" : struct_add,
+                     "struct_remove" : struct_remove,
+                     "atoms" : atoms,
+                     "new_chain" : new_chain,
+                     "new_chain_attributes" : new_chain_attributes,
+                     "new_segment" : new_segment,
+                     "new_segment_attributes" : new_segment_attributes,
+                     "new_residue" : new_residue,
+                     "new_residue_attributes" : new_residue_attributes}
+
+                #-----------------------------------------------------#
+
                 # For each key and associated sub-structure
                 # in the current level of the structure
-                for key, sub_dict in list(struct_iter.items()):
-                    
-                    # If we reached the residues' level
-                    if current_depth == 4:
-
-                        # Set the next level to be the atoms'
-                        # level (since they are stored in the
-                        # 'atoms' dictionary within each
-                        # residue)
-                        sub_dict = struct_iter[key]["atoms"]
+                for key, sub_struct in list(struct_iter.items()):
                     
                     # If we are at the models' level
-                    elif current_depth == 1:
+                    if current_depth == 1:
 
                         # Reset the current path
-                        current_path = ()
+                        current_path = ((key, sub_struct["_attributes"]),)
 
-                    # Recursively traverse the sub-dictionary
-                    recursive_step(\
-                        struct_iter = sub_dict,
-                        struct_add = struct_add,
-                        struct_remove = struct_remove,
-                        atoms = atoms,
-                        new_chain = new_chain,
-                        new_segment = new_segment,
-                        new_residue = new_residue,
-                        current_depth = current_depth + 1,
-                        current_path = current_path + (key,))
+                        # Recursively traverse the sub-structure
+                        recursive_step(\
+                            struct_iter = sub_struct, 
+                            current_depth = current_depth + 1,
+                            current_path = current_path,
+                            **recurse_args)
+
+                    #-------------------------------------------------#
+
+                    # Otherwise
+                    else:
+
+                        # If we are at a level containing items
+                        if current_depth in self._IDS_DEPTH_TO_LEVELS:
+
+                            # Recursively traverse the sub-structure
+                            # updating the 'current_path'
+                            recursive_step(\
+                                struct_iter = sub_struct,
+                                current_depth = current_depth + 1,
+                                current_path = \
+                                  current_path + \
+                                  ((key, sub_struct["_attributes"]),),
+                                **recurse_args)
+
+                        # If we are at a ["_items", "_attributes"]
+                        # level
+                        else:
+
+                            # Recursively traverse the sub-structure
+                            # keeping the same 'current_path'
+                            recursive_step(\
+                                struct_iter = sub_struct,
+                                current_depth = current_depth + 1,
+                                current_path = current_path,
+                                **recurse_args)
 
 
         #---------------------- Move the atoms -----------------------#
 
 
+        # Set the arguments that will be used for the recursive
+        # function whether the structure will be modified in place
+        # or not
+        recurse_args = \
+            {# The structure to iterate over (it will not be
+             # modified
+             "struct_iter" : copy.deepcopy(self.atom_data),
+             # The list of serial numbers of the atoms to be moved
+             "atoms" : atoms,
+             # The ID of the new chain
+             "new_chain" : new_chain,
+             # The attributes of the new chain, or an empty
+             # dictionary if not specified
+             "new_chain_attributes" : \
+                new_chain_attributes \
+                if new_chain_attributes else {},
+             # The ID of the new segment
+             "new_segment" : new_segment,
+             # The attributes of the new segment, or an empty
+             # dictionary if not specified
+             "new_segment_attributes" : \
+                new_segment_attributes \
+                if new_segment_attributes else {},
+             # The ID of the new residue
+             "new_residue" : new_residue,
+             # The attributes of the new residue, or an empty
+             # dictionary if not specified
+             "new_residue_attributes" : \
+                new_residue_attributes \
+                if new_residue_attributes else {}}
+
+        #-------------------------------------------------------------#
+
         # If we need to add the atoms to a new structure
         if not in_place:
 
             # Create an empty structure
-            new_struct = Structure()
+            new_struct = self.__class__()
 
             # Move the atoms from one structure to the other
             recursive_step(\
-                struct_iter = copy.deepcopy(self.atom_data),
                 struct_add = new_struct._atom_data,
                 struct_remove = self._atom_data,
-                atoms = atoms,
-                new_chain = new_chain,
-                new_segment = new_segment,
-                new_residue = new_residue)
+                **recurse_args)
 
-            # Copy the CONECT data from the old structure to the
+            # Copy the connectivity data from the old structure to the
             # new structure
             new_struct._conect_data = copy.deepcopy(self.conect_data)
 
             # Renumber the atoms in the current structure (it also
-            # updates the CONECT data, removing the records for
-            # atoms no longer in the structure)
+            # updates the connectivity data, removing the records
+            # for atoms no longer in the structure)
             self._renumber_atoms()
 
             # Renumber the atoms in the new structure (it also
-            # updated the CONECT data, removing the records for
-            # atoms no longer in the structure)
+            # updated the connectivity data, removing the records
+            # for atoms no longer in the structure)
             new_struct._renumber_atoms()
             
             # Return the new structure
             return new_struct
+
+        #-------------------------------------------------------------#
 
         # If we need to move the atoms within the same structure
         else:
 
             # Move the atoms within the structure
             recursive_step(\
-                    struct_iter = copy.deepcopy(self.atom_data),
-                    struct_add = self._atom_data,
-                    struct_remove = self._atom_data,
-                    atoms = atoms,
-                    new_chain = new_chain,
-                    new_segment = new_segment,
-                    new_residue = new_residue)
+                struct_add = self._atom_data,
+                struct_remove = self._atom_data,
+                **recurse_args)
 
             # Renumber the atoms in the current structure (it also
-            # updates the CONECT data, removing the records for
-            # atoms no longer in the structure)
+            # updates the connectivity data, removing the records
+            # for atoms no longer in the structure)
             self._renumber_atoms()
 
 
@@ -1710,22 +3131,22 @@ class Structure:
                            current_depth = 1,
                            current_path = ()):
 
-            # If we have reached the atoms' level (it is at depth
-            # 5 in this case because we 'skipped' a level when
-            # defining the sub-structure to recurse through at
-            # depth 4)
-            if current_depth == 5: 
+            # If we have reached the atoms' level
+            if current_depth == 7: 
 
                 # Create a new dictionary to store the atoms
                 # in the new order
                 new_atoms_order = {}
-                
+
+                #-----------------------------------------------------#
+
                 # Get the atoms matching the names of those provided
                 expected_atoms = \
                     {atom_serial : atom_data \
                      for atom_serial, atom_data \
                      in struct.items() \
-                     if atom_data["atom_name"] in atoms_names}
+                     if atom_data["_attributes"]["label_atom_id"] \
+                        in atoms_names}
                 
                 # Get the extra atoms in the current residue
                 # (atoms whose names are not included in the
@@ -1734,12 +3155,15 @@ class Structure:
                     {atom_serial : atom_data \
                      for atom_serial, atom_data \
                      in struct.items() \
-                     if atom_data["atom_name"] not in atoms_names}
+                     if atom_data["_attributes"]["label_atom_id"] \
+                         not in atoms_names}
 
-                # Get the atoms than were found in the current residue
+                #-----------------------------------------------------#
+
+                # Get the atoms that were found in the current residue
                 found_atoms = \
-                    [atom_data["atom_name"] for atom_data \
-                    in expected_atoms.values()]
+                    [atom_data["_attributes"]["label_atom_id"] \
+                     for atom_data in expected_atoms.values()]
                 
                 # Get the atoms missing from the residues by comparing
                 # the set of atoms' names in the list passed and
@@ -1757,12 +3181,14 @@ class Structure:
                     # Warn the user
                     warnstr = \
                         f"Missing atoms {', '.join(missing_atoms)} " \
-                        f"in model {model}, chain {chain}, segment " \
-                        f"{segment}, residue {residue}."
+                        f"in model {model}, chain '{chain}', " \
+                        f"segment '{segment}', residue '{residue}'."
                     logger.warning(warnstr)
 
+                #-----------------------------------------------------#
+
                 # For each provided atom name
-                for atom_name in atom_names:
+                for atom_name in atoms_names:
 
                     # For each atom found in the residue
                     for atom_serial, atom_data \
@@ -1770,11 +3196,14 @@ class Structure:
 
                         # If the current atom's name matches
                         # the current name
-                        if atom_data["atom_name"] == atom_name:
+                        if atom_data["_attributes"][\
+                            "label_atom_id"] == atom_name:
 
                             # Add it to the dictionary storing
                             # the sorted atoms
                             new_atoms_order[atom_serial] = atom_data
+
+                #-----------------------------------------------------#
 
                 # If we want to add the extra atoms before the
                 # sorted atoms
@@ -1805,23 +3234,24 @@ class Structure:
 
                 # Return the atoms in the new order
                 return new_atoms_order
+
+            #---------------------------------------------------------#
             
             # If we are at the residues' level
-            elif current_depth == 4:
+            elif current_depth == 6:
 
                 # For each residue and associated data
-                for res, res_data in struct.items():
+                for res, res_data in struct["_items"].items():
 
-                    # If the current residue's name
-                    # matches the residue type for which
-                    # we need to sort the atoms
-                    if res_data["res_name"] == residue_name:
+                    # If the current residue's name matches the type
+                    # of residue for which we need to sort the atoms
+                    if res[2] == residue_name:
 
                         # Recurse through the atoms belonging to
                         # the current residue
                         sorted_atoms = \
                             recursive_step(\
-                                struct = res_data["atoms"],
+                                struct = res_data["_items"],
                                 residue_name = residue_name,
                                 atoms_names = atoms_names,
                                 other_atoms_position = \
@@ -1829,9 +3259,11 @@ class Structure:
                                 current_depth = current_depth + 1,
                                 current_path = current_path + (res,))
                         
-                        # Add the sorted atoms to the current
-                        # residue
-                        res_data["atoms"] = sorted_atoms
+                        # Add the sorted atoms to the current residue,
+                        # substituting the ones that were there before
+                        res_data["_items"] = sorted_atoms
+
+            #---------------------------------------------------------#
             
             # Otherwise
             else:
@@ -1873,8 +3305,164 @@ class Structure:
         #-------------------- Renumber the atoms ---------------------#
 
 
-        # Renumber the atoms (it also updates the CONECT data)
+        # Renumber the atoms (it also updates the connectivity data)
         self._renumber_atoms()
+
+
+    #---------------------------- Access -----------------------------#
+
+
+    def models(self):
+        """Get all models in the structure.
+
+        Returns
+        -------
+        models : generator
+            A generator containing the models.
+        """
+        
+        # Return the models
+        return (item for item \
+                    in self.atom_data.keys())
+
+
+    def chains(self,
+               model):
+        """Get all chains in a model.
+
+        Parameters
+        ----------
+        model : ``int``
+            The identifier of the model the chains belong to.
+
+        Returns
+        -------
+        chains : generator
+            A generator containing the chains in the
+            selected model.
+        """
+        
+        # Return the chains
+        return (item for item \
+                    in self.atom_data[model]["_items"].keys())
+
+
+    def segments(self,
+                 model,
+                 chain):
+        """Get all segments in a chain.
+
+        Parameters
+        ----------
+        model : ``int``
+            The identifier of the model the segments belongs to.
+
+        chain : ``str``
+            The identifier of the chain the segments belong to.
+
+        Returns
+        -------
+        segments : generator
+            A generator containing the segments in the
+            selected model and chain.
+        """
+
+        # Return the segments
+        return (item for item \
+                    in self.atom_data[model]["_items"][\
+                        chain]["_items"].keys())
+
+    def residues(self,
+                 model,
+                 chain,
+                 segment):
+        """Get all residues in a segment.
+
+        Parameters
+        ----------
+        model : ``int``
+            The identifier of the model the residues belongs to.
+
+        chain : ``str``
+            The identifier of the chain the residues belong to.
+
+        segment : ``str``
+            The identifier of the segment the residues belong to.
+
+        Returns
+        -------
+        residues : generator
+            A generator containing the residues in the
+            selected model, chain, and segment.
+        """
+
+        # Return the residues
+        return (item for item \
+                    in self.atom_data[model]["_items"][\
+                        chain]["_items"][segment]["_items"].keys())
+
+    def atoms(self,
+              model,
+              chain,
+              segment,
+              residue):
+        """Get all atoms in a residue.
+
+        Parameters
+        ----------
+        model : ``int``
+            The identifier of the model the atoms belong to.
+
+        chain : ``str``
+            The identifier of the chain the atoms belong to.
+
+        segment : ``str``
+            The identifier of the segment the atoms belong to.
+
+        residue : ``tuple``
+            The identifier of the residue the atoms belong to.
+
+            The identifier is a tuple containing the residue's
+            number, insertion code, and name.
+
+        Returns
+        -------
+        atoms : generator
+            A generator containing the atoms in the
+            selected model, chain, segment, and residue.
+        """
+
+        # Return the atoms
+        return (item for item \
+                    in self.atom_data[model]["_items"][\
+                        chain]["_items"][segment]["_items"][\
+                            residue]["_items"].keys())
+
+
+    def atom_serial(self,
+                    path):
+        """Get the serial number of a specific atom, given
+        the 'path' to the atom in the structure in terms
+        of the model, chain, segment, and residue the atom
+        belongs to, plus the atom's name.
+
+        This method assumes that, within each residue, the
+        atoms' names are unique.
+
+        Parameters
+        ----------
+        path : ``tuple``
+            The 'path' to the atom (the model, chain, segment,
+            and residue it belongs to, plus the atom's name).
+
+        Returns
+        -------
+        atom_serial : ``int```
+            The serial number of the atom the 'path' points to.
+        """
+
+        # Return the result of the internal method
+        return self._get_atom_serial(path = path)
 
 
     #----------------------------- Copy ------------------------------#
@@ -1889,26 +3477,32 @@ class Structure:
             A copy of the current structure.
         """
         
-        return Structure(atom_data = copy.deepcopy(self.atom_data),
-                         conect_data = copy.deepcopy(self.conect_data),
-                         name = copy.deepcopy(self.name))
+        # We 'deepcopy' each element of the structure and return
+        # a new one because just 'deepcopying' the 'Structure'
+        # raises errors
+        return self.__class__(\
+                atom_data = copy.deepcopy(self.atom_data),
+                conect_data = copy.deepcopy(self.conect_data),
+                name = copy.deepcopy(self.name))
 
 
-    #---------------------- Update CONECT data -----------------------#
+    #----------------- Update the connectivity data ------------------#
 
 
     def add_bonds(self,
                   bonds,
+                  bonds_attributes = None,
                   in_place = False):
-        """Add bonds between pairs of atoms. This updates the
-        CONECT data associated with the structure.
+        """Add bonds between pairs of atoms, updating the
+        connectivity data of the structure while preserving
+        atomic coordinates.
 
         Parameters
         ----------
         bonds : ``list``
             A list of tuples, each representing a bond between two
-            atoms and whether the bond is a ``"single"``, 
-            ``"double"``, or ``"triple"`` bond.
+            atoms. The tuple must contain the first atom, the
+            second atom, the bond's type and the bond's order
 
             An atom can be represented either by its unique
             serial number or by its "path", namely a tuple
@@ -1917,36 +3511,45 @@ class Structure:
             based on the assumption that, within each residue,
             atoms must have unique names.
 
-            For instance, a single bond between atom 1 and atom 2
-            could be represented as ``(1, 2, "single")`` or as
-            ``((1, "A", "", (1, " "), "N"), 
-            (1, "A", "", (1, " "), "CA"),
-            "single")``, assuming that both atoms belong to
-            model 1, chain A, an unnamed segment, residue 1 with
-            insertion code " " (= no insertion code), and one is
+            For instance, a single covalent bond between atom 1 and
+            atom 2 could be represented as ``(1, 2, "covale", "sing")``
+            or as ``((1, "A", "", (1, "", "MET"), "N"), 
+            (1, "A", "", (1, "", "MET"), "CA"), "covale",
+            "sing")``, assuming that both atoms belong to
+            model 1, chain A, an unnamed segment, residue 1 (a MET)
+            with insertion code "" (= no insertion code), and one is
             named N, while the other is named CA. The model's
             specification is necessary because atoms in the same
             chain, segment, and residue may have different serial
             numbers in different models.
 
+            Supported bond types are:
+            - ``"covale"`` for covalent bonds.
+            - ``"disulf"`` for disulfide bridges.
+            - ``"hydrog"`` for hydrogen bonds.
+            - ``"metalc"`` for metal coordination.
+
+            Supported bond orders are:
+            - ``"sing"`` for single bonds.
+            - ``"doub"`` for double bonds.
+            - ``"trip"`` for triple bonds.
+            - ``"quad"`` for quadruple bonds.
+
             Each bond should be specified only once (for instance,
             we should not specify a bond between atom 2 and atom 1
             if we have already specified a bond between atom 1 and
-            atom 2) since, for each bond specified, the CONECT records
-            for both atoms involved in the bond will be updated.
+            atom 2) since, for each bond specified, the connectivity
+            data for both atoms involved in the bond will be updated.
 
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        bonds_attributes : ``dict``, optional
+            A dictionary mapping each bond in ``bonds`` to a dictionary
+            of attributes that will be assigned to the bond.
         """
 
         # Set the keyword arguments to pass to the internal method
-        kwargs = {"bonds" : bonds}
+        kwargs = \
+            {"bonds" : bonds,
+             "bonds_attributes" : bonds_attributes}
 
         # If the structure needs to be modified in place
         if in_place:
@@ -1990,795 +3593,507 @@ class Structure:
         return self._merge(other = other)
 
 
-    #--------------------- Rename/renumber items ---------------------#
+    #--------------------------- Get items ---------------------------#
 
 
-    def renumber_models(self,
-                        mapping = None,
-                        start = None,
-                        models = None,
-                        in_place = False):
-        """Renumber models in the structure.
-
-        You can either provide a dictionary mapping the old
-        numbering to the new numbering (``mapping``) or a
-        starting number for the new numbering (``start``).
-
-        You can choose to renumber only some models by using
-        the ``models`` option.
+    def get_items(self,
+                  action,
+                  level,
+                  squeeze = None,
+                  models = None,
+                  models_attributes = None,
+                  chains = None,
+                  chains_attributes = None,
+                  segments = None,
+                  segments_attributes = None,
+                  residues = None,
+                  residues_attributes = None,
+                  atoms = None,
+                  atoms_attributes = None):
+        """Get the identifiers of specific items from
+        the ``Structure``.
 
         Parameters
         ----------
-        mapping : ``dict``, optional
-            The mapping between the old numbering
-            and the new numbering.
+        action : ``str``, {``"get_unique"``, ``"get_min"``, \
+            ``"get_max"``}
+            The 'get' action to be performed:
+            - ``"get_unique"`` retrieves unique identifiers.
+            - ``"get_min"`` retrieves the minimum among the
+              identifiers.
+            - ``"get_max"`` retrieved the maximum among the
+              identifiers.
 
-        start : ``int``, optional
-            The new starting number for the models.
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}
+            At which level of the hierarchy we should retrieve
+            items.
 
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models to be
-            renumbered. If not provided, all models
+        squeeze : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}, optional
+            At which level of the hierarchy items should be
+            'squeezed', meaning that the 'get' action will
+            involve all values found at deeper levels and
+            consider them all together.
+
+            For instance, if ``action = "get_unique"``, 
+            ``level = "residues"``, and ``squeeze = "chains"``,
+            the result will be a dictionary mapping each model
+            to the chains it contains, and each chain will be
+            mapped to a list containing all unique residues
+            found in the chain. This will ignore the segments
+            they residues belong to, meaning that if residues with
+            the same ID are found in different segments, they will
+            be reported only once.
+
+            If ``squeeze`` is not specified, it will automatically
+            be set to the level above ``"level"``.
+
+            The hierarchy goes: models > chains > segments > 
+            residues > atoms.
+
+        models : ``list``, optional
+            The unique models to be retrieved if ``level = "models"``.
+
+            Otherwise, the models from which the selected chains,
+            segments, residues, or atoms will be retrieved. If
+            not provided, all models will be considered.
+
+            Each model is defined by its number.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            Only models whose attributes' values are
+            among the accepted ones will be considered.
+
+        chains : ``list``, optional
+            The unique models to be retrieved if ``level = "chains"``.
+
+            Otherwise, the chains from which the selected
+            segments, residues, or atoms will be retrieved. If
+            not provided, all chains in the selected models
             will be considered.
 
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
+            Each chains is defined by its identifier.
 
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            Only chains whose attributes' values are
+            among the accepted ones will be considered.
+
+        segments : ``list``, optional
+            The unique segments to be retrieved if 
+            ``level = "segments"``.
+
+            Otherwise, the segments from which the selected
+            residues, or atoms will be retrieved. If
+            not provided, all segments in the selected models
+            and chains will be considered.
+
+            Each segments is defined by its identifier.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            Only segments whose attributes' values are
+            among the accepted ones will be considered.
+
+        residues : ``list``, optional
+            The unique residues to be retrieved if 
+            ``level = "residues"``.
+
+            Otherwise, the residues from which the selected
+            atoms will be retrieved. If not provided,
+            all residues will be considered.
+
+            Each residue is defined by either its full
+            identifier (sequence number, insertion code, and
+            name), its sequence number, or its name.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            Only residues whose attributes' values are
+            among the accepted ones will be considered in the
+            selected segments, chains, and models.
+
+        atoms : ``list``, optional
+            The unique atoms to be retrieved if
+            ``level = "atoms"``.
+            
+            Each atom is defined by its serial number.
+
+        atoms_attributes : ``dict``, optional
+            A dictionary mapping names of atoms' attributes
+            to lists of their accepted values.
+
+            Only atoms whose attributes' values are
+            among the accepted ones will be considered for
+            retrieval in the selected models, chains, segments,
+            and residues.
         """
 
         # Set the keyword arguments to pass to the internal method
         kwargs = \
-            {"action" : "renumber",
-             "item" : "model",
-             "mapping" : "mapping",
-             "start" : "start",
-             "models" : models}
+            {"action" : action,
+             "level" : level,
+             "squeeze" : squeeze,
+             "elements_type" : "items",
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = atoms_attributes)}
 
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Renumber the models
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Renumber the models in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
+        # Return the result
+        return self._get(**kwargs)
 
 
-    def rename_chains(self,
-                      mapping,
+    def get_attribute(self,
+                      action,
+                      attribute,
+                      level,
+                      squeeze = None,
                       models = None,
-                      in_place = False):
-        """Rename chains in the structure.
-
-        You must provide a dictionary mapping the old
-        chain identifiers to the new identifiers
-        (``mapping``). Only chains whose identifiers
-        are in the dictionary will be renamed.
-
-        You can choose to rename chains in only some
-        models by using the ``models`` option.
+                      models_attributes = None,
+                      chains = None,
+                      chains_attributes = None,
+                      segments = None,
+                      segments_attributes = None,
+                      residues = None,
+                      residues_attributes = None,
+                      atoms = None,
+                      atoms_attributes = None):
+        """Get the unique values, minimum value, or maximum value
+        of a specific attribute from the ``Structure``.
 
         Parameters
         ----------
-        mapping : ``dict``
-            The mapping between the old identifiers
-            and the new identifiers.
+        action : ``str``, {``"get_unique"``, ``"get_min"``, \
+            ``"get_max"``}
+            The 'get' action to be performed:
+            - ``"get_unique"`` retrieves unique values for the
+              attribute.
+            - ``"get_min"`` retrieves the minimum value of
+              the attribute.
+            - ``"get_max"`` retrieved the maximum value of
+              the attribute.
 
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models whose chains
-            will be renamed. If not provided, all models
+        attribute : ``str``
+            The name of the attribute.
+
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}
+            At which level of the hierarchy the attribute
+            belongs to.
+
+        squeeze : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}, optional
+            At which level of the hierarchy the attribute's
+            values should be 'squeezed', meaning that the 'get'
+            action will involve all values found at deeper levels
+            and consider them all together.
+
+            For instance, if ``action = "get_unique"``, 
+            ``level = "residues"``, and ``squeeze = "chains"``,
+            the result will be a dictionary mapping each model
+            to the chains it contains, and each chain will be
+            mapped to a list containing all unique values for
+            a specific residue attribute found in the chain.
+
+            If ``squeeze`` is not specified, it will automatically
+            be set to the level above ``"level"``.
+
+            The hierarchy goes: models > chains > segments > 
+            residues > atoms.
+
+        models : ``list``, optional
+            If ``level = "models"``, the models whose
+            ``attribute`` values need to be retrieved.
+
+            Otherwise, the models from which chains, segments,
+            residues, and atoms will be selected. If
+            not provided, all models will be considered.
+
+            Each model is defined by its number.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            Only items in models whose attributes' values are
+            among the accepted ones will be considered.
+
+            This option is ignored if ``level = "models"``.
+
+        chains : ``list``, optional
+            If ``level = "chains"``, the chains whose
+            ``attribute`` values need to be retrieved.
+
+            Otherwise, the chains from which segments,
+            residues, or atoms will be selected. If not
+            provided, all chains in the selected models
             will be considered.
 
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
+            Each chains is defined by its identifier.
 
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+            This option is ignored if ``level = "models"``.
+
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            Only items in chains whose attributes' values are
+            among the accepted ones will be considered.
+
+            This option is ignored if ``level = "chains"``
+            or above.
+
+        segments : ``list``, optional
+            If ``level = "segments"``, the segments whose
+            ``attribute`` values need to be retrieved.
+
+            Otherwise, the segments from which residues or
+            atoms will be selected. If not provided, all
+            segments in the selected models and chains
+            will be considered.
+
+            Each segment is defined by its identifier.
+
+            This option is ignored if ``level = "chains"``
+            or above.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            Only items in segments whose attributes' values are
+            among the accepted ones will be considered.
+
+            This option is ignored if ``level = "segments"``
+            or above.
+
+        residues : ``list``, optional
+            If ``level = "residues"``, the residues whose
+            ``attribute`` values need to be retrieved.  
+
+            Otherwise, the residues from which the selected
+            atoms will be selected. If not provided,
+            all residues will be considered.
+
+            Each residue is defined by either its full
+            identifier (sequence number, insertion code, and
+            name), its sequence number, or its name.
+
+            This option is ignored if ``level = "segments"``
+            or above.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            Only residues whose attributes' values are
+            among the accepted ones will be considered in the
+            selected segments, chains, and models.
+
+            This option is ignored if ``level = "residues"``
+            or above.
+
+        atoms : ``list``, optional
+            If ``level = "atoms"``, the atoms whose
+            ``attribute`` values need to be retrieved.  
+            
+            Each atom is defined by its serial number.
         """
 
         # Set the keyword arguments to pass to the internal method
         kwargs = \
-            {"action" : "rename",
-             "item" : "chain",
-             "mapping" : mapping,
-             "models" : models}
-
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Rename the chains
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Rename the chains in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def rename_segments(self,
-                        mapping,
-                        models = None,
-                        chains = None,
-                        in_place = False):
-        """Rename the segments in the structure.
-
-        You must provide a dictionary mapping the old
-        segment identifiers to the new identifiers
-        (``mapping``). Only segments whose identifiers
-        are in the dictionary will be renamed.
-
-        You can choose to rename segments in only some
-        models or chains by using the ``models`` and
-        ``chains`` options.
-
-        Parameters
-        ----------
-        mapping : ``dict``
-            The mapping between the old identifiers
-            and the new identifiers.
-
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models whose segments
-            will be renamed. If not provided, all models
-            will be considered.
-
-        chains : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of chains whose segments
-            will be renamed. If not provided, all chains
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "rename",
-             "item" : "segment",
-             "mapping" : mapping,
-             "models" : models,
-             "chains" : chains}
-
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Rename the segments
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Rename the segments in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def renumber_residues(self,
-                          mapping = None,
-                          start = None,
-                          models = None,
-                          chains = None,
-                          segments = None,
-                          in_place = False):
-        """Renumber residues in the structure.
-
-        You can either provide a dictionary mapping the old
-        numbering to the new numbering (``mapping``) or a
-        starting number for the new numbering (``start``).
-
-        The ``mapping`` must indicate residues with their
-        sequence number (no insertion code), and all matching
-        residues will be considered by the renumbering,
-        regardless of their insertion code.
-
-        You can choose to renumber only residues in specific
-        models, chains, and segments by using the ``models``,
-        ``chains``, and ``segments`` options.
-
-        Parameters
-        ----------
-        mapping : ``dict``, optional
-            The mapping between the old numbering
-            and the new numbering.
-
-        start : ``int``, optional
-            The new starting number for the models.
-
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models whose residues
-            will be renumbered. If not provided, all models
-            will be considered.
-
-        chains : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of chains whose residues
-            will be renumbered. If not provided, all chains
-            will be considered.
-
-        segments : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of segments whose residues
-            will be renumbered. If not provided, all segments
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "renumber",
-             "item" : "residue",
-             "mapping" : mapping,
-             "start" : start,
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments}
-
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Renumber the residues
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Renumber the residues in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def rename_residues(self,
-                        mapping,
-                        models = None,
-                        chains = None,
-                        segments = None,
-                        in_place = False):
-        """Change the names (type) of residues.
-
-        You must provide a dictionary mapping the
-        residues' old names to the residues' new names
-        (``mapping``).
-
-        Parameters
-        ----------
-        mapping : ``dict``
-            The mapping between the residues' old names
-            to the residues' new names.
-
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models whose residues
-            will be renamed. If not provided, all models
-            will be considered.
-
-        chains : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of chains whose residues
-            will be renamed. If not provided, all chains
-            will be considered.
-
-        segments : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of segments whose residues
-            will be renamed. If not provided, all segments
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "rename",
-             "item" : "residue_attribute",
-             "mapping" : mapping,
-             "attribute" : "res_name",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments}
-
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Rename the residues
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Rename the residues in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def rename_atoms(self,
-                     mapping,
-                     models = None,
-                     chains = None,
-                     segments = None,
-                     residues = None,
-                     residues_types = None,
-                     in_place = False):
-        """Change the names of atoms. The atoms' types
-        remain invaried. This is useful especially to
-        convert between nomenclatures for hydrogens
-        used by different programs generating
-        PDB files.
-
-        You must provide a dictionary mapping the
-        atoms' old names to the atoms' new names
-        (``mapping``).
-
-        Parameters
-        ----------
-        mapping : ``dict``
-            The mapping between the atoms' new names
-            and the atoms' new names.
-
-        models : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of models whose atoms
-            will be renamed. If not provided, all models
-            will be considered.
-
-        chains : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of chains whose atoms
-            will be renamed. If not provided, all chains
-            will be considered.
-
-        segments : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of segments whose atoms
-            will be renamed. If not provided, all segments
-            will be considered.
-
-        residues : ``list``, ``tuple``, or ``set``, optional
-            A list, tuple, or set of residues whose atoms
-            will be renamed. If not provided, all residues
-            will be considered.
-
-        residues_types : ``list``, ``tuple``, or ``set``, \
-            optional
-            A list, tuple, or set of residue types whose atoms
-            will be renamed. If not provided, residues of all
-            types will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "rename",
-             "item" : "atom_attribute",
-             "mapping" : mapping,
-             "attribute" : "atom_name",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments,
-             "residues" : residues,
-             "residues_types" : residues_types}
-
-        # If the structure needs to be modified in place
-        if in_place:
-
-            # Rename the atoms
-            self._relabel(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Rename the atoms in the new structure
-            struct_new._relabel(**kwargs)
-
-            # Return the new structure
-            return struct_new
+            {"action" : action,
+             "level" : level,
+             "squeeze" : squeeze,
+             "elements_type" : "attributes",
+             "attribute" : attribute,
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = None)}
+
+        # Return the result
+        return self._get(**kwargs)
 
 
     #-------------------------- Keep items ---------------------------#
 
 
-    def keep_models(self,
-                    models,
-                    in_place = False):
-        """Keep only selected models.
+    def keep_items_path(self,
+                        items,
+                        path,
+                        in_place = False):
+        """Keep only selected items in a 'path' in the 
+        structure's hierarchy.
+
+        For instance, keep only selected residues given the path
+        to them in the form of the model, chain, and segment they
+        belong to.
 
         Parameters
         ----------
-        models : ``list``
+        items : ``list``
+            The IDs of the items to be kept.
+
+        path : ``tuple``
+            A tuple containing the IDs of the elements in the
+            path.
+
+            The longest path is the one leading to specific
+            atoms, and consists of the model, chain, segment,
+            and residue the atoms belong to.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+        """
+
+        # Get the items to be kept from the selected level
+        # of the hierarchy
+        new_data = \
+            {item : item_data for item, item_data in \
+             self[path].items() if item in items}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Set the items
+            self[path] = new_data
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected items in the new structure
+            struct_new[path] = new_data
+
+            # Return the new structure
+            return struct_new
+
+
+    def keep_items(self,
+                   models = None,
+                   models_attributes = None,
+                   chains = None,
+                   chains_attributes = None,
+                   segments = None,
+                   segments_attributes = None,
+                   residues = None,
+                   residues_attributes = None,
+                   atoms = None,
+                   atoms_attributes = None,
+                   in_place = False):
+        """Keep only selected items in the structure.
+
+        Parameters
+        ----------
+        models : ``list``, optional
             The models to be kept.
 
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
+            Each model is defined by its number.
 
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
+            If not provided, all models will be kept.
 
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : models,
-             "items_type" : "model"}
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
 
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected models
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected models in the new structure
-            self._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-        # There is no need to renumber the atoms since
-        # the atom numbering re-starts for each model
-
-
-    def keep_chains(self,
-                    chains,
-                    models = None,
-                    in_place = False):
-        """Keep only selected chains.
-
-        Parameters
-        ----------
-        chains : ``list``
-            The chains to be kept.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            chains to be kept.
-
-            The chains whose identifiers match the ones
-            provided in ``chains`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : chains,
-             "items_type" : "chain",
-             "models" : models}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected chains
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected chains in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_segments(self,
-                      segments,
-                      models = None,
-                      chains = None,
-                      in_place = False):
-        """Keep only selected segments.
-
-        Parameters
-        ----------
-        segments : ``list``
-            The segments to be kept.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            segments to be kept.
-
-            The segments whose identifiers match the ones
-            provided in ``segments`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
+            Only models whose attributes' values are
+            among the accepted ones will be kept.
 
         chains : ``list``, optional
-            The chains considered when selecting the
-            segments to be kept.
+            The chains to be kept in the selected models.
             
-            The segments whose identifiers match the ones
-            provided in ``segments`` will be removed only
-            from the selected models.
+            Each chain is defined by its chain identifier.
 
-            If no ``chains`` are provided, all chains
-            will be considered.
+            If not provided, all chains will be kept.
 
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
 
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : segments,
-             "items_type" : "segment",
-             "models" : models,
-             "chains" : chains}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected segments
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected segments in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_residues(self,
-                      residues,
-                      models = None,
-                      chains = None,
-                      segments = None):
-        """Keep only selected residues.
-
-        Parameters
-        ----------
-        residues : ``list``
-            The residues to be kept.
-
-            It can be eiter a list of integers representing
-            the sequence numbers of the residues to be removed,
-            a list of tuples representing the sequence
-            number/insertion code pairs of the residues to be
-            removed, a list of strings representing the types
-            of the residues to be removed, or a list with
-            mixed integers, string, and tuples.
-
-            For the integers in the list, residues whose
-            sequence numbers match the integers will be
-            kept regardless of their insertion codes.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            residues to be kept.
-
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-
-        chains : ``list``, optional
-            The chains considered when selecting the
-            residues to be kept.
-            
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected chains.
-
-            If no ``chains`` are provided, all chains
-            will be considered.
+            Only chains whose attributes' values are
+            among the accepted ones will be kept in the
+            selected models.
 
         segments : ``list``, optional
-            The segments considered when selecting the
-            residues to be kept.
-
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected segments.
-
-            If no ``segments`` are provided, all segments
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : residues,
-             "items_type" : "residue",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments}
-
-        # If the structure needs to be modified in place
-        if in_place:
+            The segments to be kept in the selected models and
+            chains.
             
-            # Keep only the selected residues
-            self._keep_or_remove(**kwargs)
+            Each segment is defined by its segment identifier.
 
-        # Otherwise
-        else:
+            If not provided, all segments will be kept.
 
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
 
-            # Keep only the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_atoms(self,
-                   atoms,
-                   models = None,
-                   chains = None,
-                   segments = None,
-                   residues = None,
-                   in_place = False):
-        """Keep only selected atoms.
-
-        Parameters
-        ----------
-        atoms : ``list``
-            The atoms to be kept.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            atoms to be kept.
-
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be kept only
-            in the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-
-        chains : ``list``, optional
-            The chains considered when selecting the
-            atoms to be kept.
-
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be kept only
-            in the selected chains.
-
-            If no ``chains`` are provided, all chains
-            will be considered.
-
-        segments : ``list``, optional
-            The segments considered when selecting the
-            atoms to be kept.
-
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be kept only
-            in the selected segments.
-
-            If no ``segments`` are provided, all segments
-            will be considered.
+            Only segments whose attributes' values are
+            among the accepted ones will be kept in the
+            selected models and chains.
 
         residues : ``list``, optional
-            The residues considered when selecting
-            the atoms to be kept.
+            The residues to be kept in the selected models,
+            chains, and segments.
 
-            It can be eiter a list of integers representing
-            the sequence numbers of the residues to be removed,
-            a list of tuples representing the sequence
-            number/insertion code pairs of the residues to be
-            removed, a list of strings representing the types
-            of the residues to be removed, or a list with
-            mixed integers, string, and tuples.
+            Each residue is defined by either its full
+            identifier (sequence number, insertion code, and
+            name), its sequence number, or its name.
 
-            For the integers in the list, residues whose
-            sequence numbers match the integers will be
-            considered regardless of their insertion codes.
+            If not provided, all segments will be kept.
 
-            If no ``residues`` are provided, all residues
-            will be considered.
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            Only residues whose attributes' values are
+            among the accepted ones will be kept in the
+            selected segments, chains, and models.
+
+        atoms : ``list``, optional
+            The atoms to be kept in the selected models,
+            chains, segments, and residues.
+            
+            Each atom is defined by its serial number.
+            
+            If not provided, all atoms will be kept.
+
+        atoms_attributes : ``dict``, optional
+            A dictionary mapping names of atoms' attributes
+            to lists of their accepted values.
+
+            Only atoms whose attributes' values are
+            among the accepted ones will be kept in the
+            selected models, chains, segments, and residues.
 
         in_place : ``bool``, ``False``
             Whether to modify the structure in place. If ``False``,
@@ -2786,25 +4101,32 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
         """
 
         # Set the keyword arguments to pass to the internal method
         kwargs = \
             {"action" : "keep",
-             "items" : atoms,
-             "items_type" : "atom",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments,
-             "residues" : residues}
+             "elements_type" : "items",
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = atoms_attributes)}
 
         # If the structure needs to be modified in place
         if in_place:
             
-            # Keep only the selected atoms
-            self._keep_or_remove(**kwargs)
+            # Keep only the selected items
+            self._modify(**kwargs)
 
         # Otherwise
         else:
@@ -2812,173 +4134,8 @@ class Structure:
             # Create a copy of the current structure
             struct_new = self.get_copy()
 
-            # Keep only the selected atoms in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_protein(self,
-                     extra_protein_residues = None,
-                     in_place = False):
-        """Keep only protein residues.
-
-        Parameters
-        ----------
-        extra_protein_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered protein residues.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Get the canonical set of protein residues
-        protein_residues = self._RESNAMES_PROTEIN
-
-        # If a list of extra residues was passed
-        if extra_protein_residues is not None:
-
-            # Add the residues to the set
-            protein_residues.extend(extra_protein_residues)
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : protein_residues,
-             "items_type" : "residue"}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_dna(self,
-                 extra_dna_residues = None,
-                 in_place = False):
-        """Keep only DNA residues.
-
-        Parameters
-        ----------
-        extra_dna_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered DNA residues.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Get the canonical set of DNA residues
-        dna_residues = self._RESNAMES_DNA
-
-        # If a list of extra residues was passed
-        if extra_dna_residues is not None:
-
-            # Add the residues to the set
-            dna_residues.extend(extra_dna_residues)
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : dna_residues,
-             "items_type" : "residue"}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def keep_rna(self,
-                 extra_rna_residues = None,
-                 in_place = False):
-        """Keep only RNA residues.
-
-        Parameters
-        ----------
-        extra_rna_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered RNA residues.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Get the canonical set of RNA residues
-        rna_residues = self._RESNAMES_RNA
-
-        # If a list of extra residues was passed
-        if extra_rna_residues is not None:
-
-            # Add the residues to the set
-            rna_residues.extend(extra_rna_residues)
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "keep",
-             "items" : rna_residues,
-             "items_type" : "residue"}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Keep only the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Keep only the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
+            # Keep only the selected items in the new structure
+            struct_new._modify(**kwargs)
 
             # Return the new structure
             return struct_new
@@ -2987,37 +4144,46 @@ class Structure:
     #------------------------- Remove items --------------------------#
 
 
-    def remove_models(self,
-                      models,
-                      in_place = False):
-        """Remove selected models.
+    def remove_items_path(self,
+                          items,
+                          path,
+                          in_place = False):
+        """Remove selected items in a 'path' in the 
+        structure's hierarchy.
+
+        For instance, remove selected residues given the path
+        to them in the form of the model, chain, and segment they
+        belong to.
 
         Parameters
         ----------
-        models : ``list``
-            The models to be removed.
+        items : ``list``
+            The IDs of the items to be removed.
+
+        path : ``tuple``
+            A tuple containing the IDs of the elements in the
+            path.
+
+            The longest path is the one leading to specific
+            atoms, and consists of the model, chain, segment,
+            and residue the atoms belong to.
 
         in_place : ``bool``, ``False``
             Whether to modify the structure in place. If ``False``,
             a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
         """
 
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : models,
-             "items_type" : "model"}
+        # Remove the items from the selected level of
+        # the hierarchy
+        new_data = \
+            {item : item_data for item, item_data in \
+             self[path].items() if item not in items}
 
         # If the structure needs to be modified in place
         if in_place:
             
-            # Remove the selected models
-            self._keep_or_remove(**kwargs)
+            # Set the items
+            self[path] = new_data
 
         # Otherwise
         else:
@@ -3025,309 +4191,135 @@ class Structure:
             # Create a copy of the current structure
             struct_new = self.get_copy()
 
-            # Remove the selected models in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-        # There is no need to renumber the atoms since
-        # the atom numbering re-starts for each model
-
-
-    def remove_chains(self,
-                      chains,
-                      models = None,
-                      in_place = False):
-        """Remove selected models.
-
-        Parameters
-        ----------
-        chains : ``list``
-            The chains to be removed.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            chains to remove.
-
-            The chains whose identifiers match the ones
-            provided in ``chains`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : chains,
-             "items_type" : "chain",
-             "models" : models}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Remove the selected chains
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Remove the selected chains in the new structure
-            struct_new._keep_or_remove(**kwargs)
+            # Keep only the selected items in the new structure
+            struct_new[path] = new_data
 
             # Return the new structure
             return struct_new
 
 
-    def remove_segments(self,
-                        segments,
-                        models = None,
-                        chains = None,
-                        in_place = False):
-        """Remove segments from the structure.
-
-        Parameters
-        ----------
-        segments : ``list``
-            The segments to be removed.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            segments to remove.
-
-            The segments whose identifiers match the ones
-            provided in ``segments`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-
-        chains : ``list``, optional
-            The chains considered when selecting the
-            segments to remove.
-
-            The segments whose identifiers match the ones
-            provided in ``segments`` will be removed only
-            from the selected chains.
-
-            If no ``chains`` are provided, all chains
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : segments,
-             "items_type" : "segment",
-             "models" : models,
-             "chains" : chains}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Remove the selected segments
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Remove the selected segments in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def remove_residues(self,
-                        residues,
-                        models = None,
-                        chains = None,
-                        segments = None,
-                        in_place = False):
-        """Remove residues from the structure.
-
-        Parameters
-        ----------
-        residues : ``list``
-            The residues to be removed.
-
-            It can be eiter a list of integers representing
-            the sequence numbers of the residues to be removed,
-            a list of tuples representing the sequence
-            number/insertion code pairs of the residues to be
-            removed, a list of strings representing the types
-            of the residues to be removed, or a list with
-            mixed integers, string, and tuples.
-
-            For the integers in the list, residues whose
-            sequence numbers match the integers will be
-            removed regardless of their insertion codes.
-
-        models : ``list``, optional
-            The models considered when selecting the
-            residues to remove.
-
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected models.
-
-            If no ``models`` are provided, all models
-            will be considered.
-
-        chains : ``list``, optional
-            The chains considered when selecting the
-            residues to remove.
-
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected chains.
-
-            If no ``chains`` are provided, all chains
-            will be considered.
-
-        segments : ``list``, optional
-            The segments considered when selecting the
-            residues to remove.
-
-            The residues whose identifiers, sequence
-            numbers, or types match the ones provided
-            in ``residues`` will be removed only
-            from the selected segments.
-
-            If no ``segments`` are provided, all segments
-            will be considered.
-
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : residues,
-             "items_type" : "residue",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Remove the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Remove the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def remove_atoms(self,
-                     atoms,
+    def remove_items(self,
                      models = None,
+                     models_attributes = None,
                      chains = None,
+                     chains_attributes = None,
                      segments = None,
+                     segments_attributes = None,
                      residues = None,
+                     residues_attributes = None,
+                     atoms = None,
+                     atoms_attributes = None,
+                     extra_residues = None,
                      in_place = False):
-        """Remove atoms from the structure.
+        """Remove selected items.
 
         Parameters
         ----------
-        atoms : ``list``
-            The atoms to be removed.
-
         models : ``list``, optional
-            The models considered when selecting
-            the atoms to remove.
+            The models to be removed if no chains, segments,
+            residues, atoms, or any of their attributes are
+            specified.
 
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be removed only
-            from the selected models.
+            Otherwise, the models from which the selected chains,
+            segments, residues, and atoms will be removed.
 
-            If no ``models`` are provided, all models
-            will be considered.
+            Each model is defined by its number.
+
+            If not provided, all models will be considered.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            Only items in models whose attributes' values are
+            among the accepted ones will be considered
+            for removal.
 
         chains : ``list``, optional
-            The chains considered when selecting the
-            atoms to remove.
+            The chains to be removed if no segments, residues,
+            atoms, or any of their attributes are specified.
 
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be removed only
-            from the selected chains.
+            Otherwise, the chains from which the selected
+            segments, residues, and atoms will be removed.
+            
+            Each chain is defined by its chain identifier.
 
-            If no ``chains`` are provided, all chains
+            If not provided, all chains in the selected models
             will be considered.
+
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            Only items in chains whose attributes' values are
+            among the accepted ones will be considered
+            for removal.
 
         segments : ``list``, optional
-            The segments considered when selecting
-            the atoms to remove.
+            The segments to be removed if no residues, atoms,
+            or any of their attributes are specified.
 
-            The atoms whose identifiers match the ones
-            provided in ``atoms`` will be removed only
-            from the selected segments.
+            Otherwise, the segments from which the selected
+            residues and atoms will be removed.
+            
+            Each segment is defined by its segment identifier.
 
-            If no ``segments`` are provided, all segments
-            will be considered.
+            If not provided, all segments in the selected chains
+            and models will be considered.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            Only items in segments whose attributes' values are
+            among the accepted ones will be considered
+            for removal.
 
         residues : ``list``, optional
-            The residues considered when selecting
-            the atoms to remove.
+            The residues to be removed if no atoms
+            or any of their attributes are specified.
 
-            It can be eiter a list of integers representing
-            the sequence numbers of the residues to be removed,
-            a list of tuples representing the sequence
-            number/insertion code pairs of the residues to be
-            removed, a list of strings representing the types
-            of the residues to be removed, or a list with
-            mixed integers, string, and tuples.
+            Otherwise, the residues from which the selected
+            atoms will be removed.
 
-            For the integers in the list, residues whose
-            sequence numbers match the integers will be
-            considered regardless of their insertion codes.
+            The reserved keywords ``"protein"``, ``"dna"``,
+            and ``"rna"`` can be used instead of the
+            residues' identifiers, sequence numbers, or
+            names, to remove protein, DNA, and RNA residues,
+            respectively.
 
-            If no ``residues`` are provided, all residues
-            will be considered.
+            If not provided, all residues in the selected models,
+            chains, and segments will be considered.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            Only atoms in residues whose attributes' values are
+            among the accepted ones will be considered
+            for removal.
+
+        atoms : ``list``, optional
+            The atoms to be removed in the selected models,
+            chains, segments, and residues.
+            
+            Each atom is defined by its serial number.
+            
+            If not provided, all atoms in the selected models,
+            chains, segments, and residues will be considered.
+
+        extra_residues : ``dict``, optional
+            A dictionary of names of residues that are not part of
+            the canonital sets of protein, DNA, and RNA residues,
+            but that should be considered as such. The dictionary
+            accepts three keywords:
+
+            - ``"protein"``, mapped to a list of names
+              of "extra" protein residues.
+            - ``"dna"``, mapped to a list of names
+              of "extra" DNA residues.
+            - ``"rna"``, mapped to a list of names
+              of "extra" RNA residues.
 
         in_place : ``bool``, ``False``
             Whether to modify the structure in place. If ``False``,
@@ -3335,25 +4327,43 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
+
+        Examples
+        --------
+        .. code-block:: python
+
+            # Load the 3B9F structure from the PDB
+            >>> parser = pdbcraft.MMCIFParser()
+            >>> struct = parser.parse("3B9F")
+
+            # Remove chains A and B from the structure
+            >>> new_struct = struct.remove(chains = ["A", "B"])
         """
 
         # Set the keyword arguments to pass to the internal method
         kwargs = \
             {"action" : "remove",
-             "items" : atoms,
-             "items_type" : "atom",
-             "models" : models,
-             "chains" : chains,
-             "segments" : segments,
-             "residues" : residues}
+             "elements_type" : "items",
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = atoms_attributes)}
 
         # If the structure needs to be modified in place
         if in_place:
-
-            # Remove the selected atoms
-            self._keep_or_remove(**kwargs)
+            
+            # Keep only the selected atoms
+            self._modify(**kwargs)
 
         # Otherwise
         else:
@@ -3361,54 +4371,544 @@ class Structure:
             # Create a copy of the current structure
             struct_new = self.get_copy()
 
-            # Remove the selected atoms in the new structure
-            struct_new._keep_or_remove(**kwargs)
+            # Keep only the selected atoms in the new structure
+            struct_new._modify(**kwargs)
 
             # Return the new structure
             return struct_new
 
 
-    def remove_protein(self,
-                       extra_protein_residues = None,
+    #------------------------- Rename items --------------------------#
+
+
+    def rename_items(self,
+                     level,
+                     mapping,
+                     models = None,
+                     models_attributes = None,
+                     chains = None,
+                     chains_attributes = None,
+                     segments = None,
+                     segments_attributes = None,
+                     residues = None,
+                     residues_attributes = None,
+                     atoms = None,
+                     atoms_attributes = None,
+                     in_place = False):
+        """Rename selected items.
+
+        Parameters
+        ----------
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}
+            Where the items to be renamed are in the hierarchy.
+
+        mapping : ``dict``
+            A dictionary containing the mapping between the old
+            names and the new ones.
+
+        models : ``list``, optional
+            The models to be considered when renaming.
+            
+            If no chains, segments, residues, or atoms are
+            provided, the mapping will be used to rename 
+            the models.
+
+            Otherwise, only elements in the selected
+            models will be considered for renaming.
+
+            Each model is defined by its number.
+
+            If not provided, all models will be considered.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            If chains, segments, residues, or atoms are
+            provided, only elements in models whose attributes'
+            values match the accepted ones will be considered
+            for renaming. 
+
+        chains : ``list``, optional
+            The chains to be considered when renaming.
+            
+            If no segments, residues, or atoms are provided,
+            the mapping will be used to rename chains.
+
+            Otherwise, only elements in the selected
+            chains (and models) will be considered for
+            renaming.
+            
+            Each chain is defined by its chain identifier.
+
+            If not provided, all chains in the selected
+            models will be considered.
+
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            If segments, residues, or atoms are provided, only
+            elements in chains whose attributes' values match the
+            accepted ones will be considered for renaming. 
+
+        segments : ``list``, optional
+            The segments to be considered when renaming.
+            
+            If no residues or atoms are provided, the mapping
+            will be used to rename segments.
+
+            Otherwise, only elements in the selected
+            segments (and chains and models) will be
+            considered for renaming.
+            
+            Each segment is defined by its segment identifier.
+
+            If not provided, all segments in the selected models
+            and chains will be considered.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            If residues or atoms are provided, only elements
+            in segments whose attributes' values match the
+            accepted ones will be considered for renaming.
+
+        residues : ``set``, optional
+            The residues to be considered when renaming.
+            
+            If no atoms are provided, the mapping
+            will be used to rename residues.
+
+            Otherwise, only elements in the selected
+            residues (and models, chains, and segments)
+            will be considered for renaming.
+            
+            Each residues can be defined by its full identifier,
+            its sequence number, or its name.
+
+            If not provided, all residues in the selected models,
+            chains, and segments will be considered.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            If atoms are provided, only atoms in
+            residues whose attributes' values match the
+            accepted ones will be considered for renaming.
+
+        atoms : ``list``, optional
+            The atoms to be renamed.
+
+            If atoms are provided, the mapping will
+            be used to rename them.
+
+            Each atom is defined by its serial number.
+
+            If not provided, all atoms in the selected models,
+            chains, segments, and residues will be considered.
+
+        atoms_attributes : ``dict``, optional
+            A dictionary mapping names of atoms' attributes
+            to lists of their accepted values.
+
+            If atoms are provided, only atoms in
+            whose attributes' values match the accepted
+            ones will be renamed.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
+        """
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "rename",
+             "level" : level,
+             "elements_type" : "items",
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = atoms_attributes),
+             "mapping" : mapping}
+
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected atoms
+            self._modify(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected atoms in the new structure
+            struct_new._modify(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    def assign_attribute_value(self,
+                               attribute,
+                               new_value,
+                               level,
+                               models = None,
+                               models_attributes = None,
+                               chains = None,
+                               chains_attributes = None,
+                               segments = None,
+                               segments_attributes = None,
+                               residues = None,
+                               residues_attributes = None,
+                               atoms = None,
+                               atoms_attributes = None,
+                               in_place = False):
+        """Assign a new value to a specific attribute.
+
+        Parameters
+        ----------
+        attribute : ``str``
+            The name of the attribute.
+
+        new_value : ``str``, ``int``, ``float``, ``tuple``
+            The new value of the attribute
+
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues", ``"atoms"``}
+            Where the attribute is in the hierarchy.
+
+        models : ``list``, optional
+            If ``level = "models"``, the models whose
+            ``attribute``'s value will be re-assigned.
+
+            Otherwise, only elements in the selected
+            models will be considered when re-assigning
+            the attribute's value.
+
+            Each model is defined by its number.
+
+            If not provided, all models will be considered.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            If ``level = "models"``, this option will
+            be ignored.
+
+            Otherwise, only elements in models whose values
+            match the accepted ones will be considered when
+            re-assigning the attribute's value.
+
+        chains : ``list``, optional
+            If ``level = "chains"``, the chains whose
+            ``attribute``'s value will be re-assigned.
+
+            If ``level = "models"``, this option will
+            be ignored.
+
+            Otherwise, only elements in the selected
+            chains and models will be considered when
+            re-assigning the attribute's value.
+            
+            Each chain is defined by its chain identifier.
+
+            If not provided, all chains in the selected
+            models will be considered.
+
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            If ``level = "chains"`` or above, this option
+            will be ignored.
+
+            Otherwise, only elements in chains whose values
+            match the accepted ones will be considered when
+            re-assigning the attribute's value.
+
+        segments : ``list``, optional
+            If ``level = "segments"``, the segments whose
+            ``attribute``'s value will be re-assigned.
+
+            If ``level = "chains"`` or above, this option
+            will be ignored.
+
+            Otherwise, only elements in the selected
+            segments, chains and models will be considered
+            when re-assigning the attribute's value.
+            
+            Each segment is defined by its segment identifier.
+
+            If not provided, all segments in the selected models
+            and chains will be considered.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            If ``level = "segments"`` or above, this option
+            will be ignored.
+
+            Otherwise, only elements in segments whose values
+            match the accepted ones will be considered when
+            re-assigning the attribute's value.
+
+        residues : ``set``, optional
+            If ``level = "residues"``, the residues whose
+            ``attribute``'s value will be re-assigned.
+
+            If ``level = "segments"`` or above, this option
+            will be ignored.
+
+            Otherwise, only atoms in the selected residues,
+            segments, chains and models will be considered
+            when re-assigning the attribute's value.
+            
+            Each residues can be defined by its full identifier,
+            its sequence number, or its name.
+
+            If not provided, all residues in the selected models,
+            chains, and segments will be considered.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            If ``level = "residues"`` or above, this option
+            will be ignored.
+
+            Otherwise, only atoms in residues whose values
+            match the accepted ones will be considered when
+            re-assigning the attribute's value.
+
+        atoms : ``list``, optional
+            If ``level = "atoms"``, the atoms whose
+            ``attribute``'s value will be re-assigned.
+
+            Otherwise, this option will be ignored.
+
+            Each atom is defined by its serial number.
+
+            If not provided, all atoms in the selected models,
+            chains, segments, and residues will be considered.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
+        """
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"action" : "assign",
+             "elements_type" : "attributes",
+             "attribute" : attribute,
+             "new_value" : new_value,
+             "level" : level,
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes,
+                        atoms = atoms,
+                        atoms_attributes = atoms_attributes)}
+
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Keep only the selected atoms
+            self._modify(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Keep only the selected atoms in the new structure
+            struct_new._modify(**kwargs)
+
+            # Return the new structure
+            return struct_new
+
+
+    #------------------------ Renumber items -------------------------#
+
+
+    def renumber_items(self,
+                       level,
+                       start,
+                       models = None,
+                       models_attributes = None,
+                       chains = None,
+                       chains_attributes = None,
+                       segments = None,
+                       segments_attributes = None,
+                       residues = None,
+                       residues_attributes = None,
                        in_place = False):
-        """Remove protein residues.
+        """Renumber selected items.
 
         Parameters
         ----------
-        extra_protein_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered protein residues.
-        
+        start : ``int``
+            The new starting number.
+
+        level : ``str``, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues", ``"atoms"``}
+            The level of the hierarchy where the items to
+            be renumbered are.
+
+        models : ``list``, optional
+            The models to be considered when renumbering.
+            
+            If no chains, segments, or residues are provided,
+            the renumbering will be applied to the models.
+
+            Otherwise, only elements in the selected
+            models will be considered for renumbering.
+
+            Each model is defined by its number.
+
+            If not provided, all models will be considered.
+
+        models_attributes : ``dict``, optional
+            A dictionary mapping names of models' attributes
+            to lists of their accepted values.
+
+            If chains, segments, or residues are provided,
+            only elements in models whose attributes' values
+            match the accepted ones will be considered for
+            renumbering.
+
+        chains : ``list``, optional
+            The chains to be considered when renumbering.
+            
+            If no segments or residues are provided,
+            the renumbering will be applied to the chains.
+
+            Otherwise, only elements in the selected
+            chains (and models) will be considered for
+            renumbering.
+            
+            Each chain is defined by its chain identifier.
+
+            If not provided, all chains in the selected
+            models will be considered.
+
+        chains_attributes : ``dict``, optional
+            A dictionary mapping names of chains' attributes
+            to lists of their accepted values.
+
+            If segments or residues are provided, only
+            elements in chains whose attributes' values match the
+            accepted ones will be considered for renumbering. 
+
+        segments : ``list``, optional
+            The segments to be considered when renumbering.
+            
+            If no residues are provided, the renumbering
+            will be applied to the segments.
+
+            Otherwise, only elements in the selected
+            segments (and chains and models) will be
+            considered for renumbering.
+            
+            Each segment is defined by its segment identifier.
+
+            If not provided, all segments in the selected models
+            and chains will be considered.
+
+        segments_attributes : ``dict``, optional
+            A dictionary mapping names of segments' attributes
+            to lists of their accepted values.
+
+            If residues are provided, only elements
+            in segments whose attributes' values match the
+            accepted ones will be considered for renumbering.
+
+        residues : ``set``, optional
+            The residues to be considered when renumbering.
+            
+            If they are provided, they will be the items
+            being renumbered.
+            
+            Each residues can be defined by its full identifier,
+            its sequence number, or its name.
+
+            If not provided, all residues in the selected models,
+            chains, and segments will be considered.
+
+        residues_attributes : ``dict``, optional
+            A dictionary mapping names of residues' attributes
+            to lists of their accepted values.
+
+            Only residues whose attributes' values match the
+            accepted ones will be considered for renumbering.
+
         in_place : ``bool``, ``False``
             Whether to modify the structure in place. If ``False``,
             a new ``Structure`` will be returned.
 
         Returns
         -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
         """
-
-        # Get the canonical set of protein residues
-        protein_residues = self._RESNAMES_PROTEIN
-
-        # If a list of extra residues was passed
-        if extra_protein_residues is not None:
-
-            # Add the residues to the set
-            protein_residues.extend(extra_protein_residues)
 
         # Set the keyword arguments to pass to the internal method
         kwargs = \
-            {"action" : "remove",
-             "items" : protein_residues,
-             "items_type" : "residue"}
+            {"action" : "renumber",
+             "level" : level,
+             "elements_type" : "items",
+             "start" : start,
+             "selected" : \
+                self._get_selected(\
+                        models = models,
+                        models_attributes = models_attributes,
+                        chains = chains,
+                        chains_attributes = chains_attributes,
+                        segments = segments,
+                        segments_attributes = segments_attributes,
+                        residues = residues,
+                        residues_attributes = residues_attributes)}
 
         # If the structure needs to be modified in place
         if in_place:
             
-            # Remove the selected residues
-            self._keep_or_remove(**kwargs)
+            # Keep only the selected atoms
+            self._modify(**kwargs)
 
         # Otherwise
         else:
@@ -3416,118 +4916,8 @@ class Structure:
             # Create a copy of the current structure
             struct_new = self.get_copy()
 
-            # Remove the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def remove_dna(self,
-                   extra_dna_residues = None,
-                   in_place = False):
-        """Remove DNA residues.
-
-        Parameters
-        ----------
-        extra_dna_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered DNA residues.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Get the canonical set of DNA residues
-        dna_residues = self._RESNAMES_DNA
-
-        # If a list of extra residues was passed
-        if extra_dna_residues is not None:
-
-            # Add the residues to the set
-            dna_residues.extend(extra_dna_residues)
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : dna_residues,
-             "items_type" : "residue"}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Remove the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Remove the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
-
-            # Return the new structure
-            return struct_new
-
-
-    def remove_rna(self,
-                   extra_rna_residues = None,
-                   in_place = False):
-        """Remove RNA residues.
-
-        Parameters
-        ----------
-        extra_rna_residues : ``list``, optional
-            A list of residues that are not part of the canonical
-            set but need to be considered RNA residues.
-        
-        in_place : ``bool``, ``False``
-            Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
-
-        Returns
-        -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
-        """
-
-        # Get the canonical set of RNA residues
-        rna_residues = self._RESNAMES_RNA
-
-        # If a list of extra residues was passed
-        if extra_rna_residues is not None:
-
-            # Add the residues to the set
-            rna_residues.extend(extra_rna_residues)
-
-        # Set the keyword arguments to pass to the internal method
-        kwargs = \
-            {"action" : "remove",
-             "items" : rna_residues,
-             "items_type" : "residue"}
-
-        # If the structure needs to be modified in place
-        if in_place:
-            
-            # Remove the selected residues
-            self._keep_or_remove(**kwargs)
-
-        # Otherwise
-        else:
-
-            # Create a copy of the current structure
-            struct_new = self.get_copy()
-
-            # Remove the selected residues in the new structure
-            struct_new._keep_or_remove(**kwargs)
+            # Keep only the selected atoms in the new structure
+            struct_new._modify(**kwargs)
 
             # Return the new structure
             return struct_new
@@ -3539,8 +4929,11 @@ class Structure:
     def move_atoms(self,
                    atoms,
                    new_chain = None,
+                   new_chain_attributes = None,
                    new_segment = None,
+                   new_segment_attributes = None,
                    new_residue = None,
+                   new_residue_attributes = None,
                    in_place = False):
         """Move a set of atoms to another (possibly new) chain,
         segment, and/or residue.
@@ -3557,19 +4950,31 @@ class Structure:
             If no chain identifier is passed, the atoms are
             kept on the same chain they were before.
 
+        new_chain_attributes : ``dict``, optional
+            A dictionary of attributes for the new chain,
+            if ``new_chain`` is provided.
+
         new_segment : ``str``, optional
             The identifier of a new segment to move the atoms to.
 
             If no segment identifier is passed, the atoms are
             kept on the same segment they were before.
 
+        new_segment_attributes : ``dict``, optional
+            A dictionary of attributes for the new segment,
+            if ``new_segment`` is provided.
+
         new_residue : ``tuple``, optional
             A tuple containing the sequence number, the
-            iCode, and the name of a new residue to move
+            insertion code, and the name of a new residue to move
             the atoms to.
 
             If no residue is passed, the atoms are kept on
             the same residue they were before.
+
+        new_residue_attributes : ``dict``, optional
+            A dictionary of attributes for the new residue,
+            if ``new_resiue`` is provided.
 
         in_place : ``bool``, ``False``
             Whether to modify the structure in place. If ``False``,
@@ -3577,17 +4982,20 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
         """
 
         # Move the atoms
-        return self._move_atoms(atoms = atoms,
-                                create_new_struct = not in_place,
-                                new_chain = new_chain,
-                                new_segment = new_segment,
-                                new_residue = new_residue,
-                                in_place = in_place)
+        return self._move_atoms(\
+                    atoms = atoms,
+                    new_chain = new_chain,
+                    new_chain_attributes = new_chain_attributes,
+                    new_segment = new_segment,
+                    new_segment_attributes = new_segment_attributes,
+                    new_residue = new_residue,
+                    new_residue_attributes = new_residue_attributes,
+                    in_place = in_place)
 
 
     #-------------------------- Sort atoms ---------------------------#
@@ -3632,8 +5040,8 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.Structure`` if ``in_place = False``, ``None``
-        otherwise
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
         """
 
         # Set the keyword arguments to pass to the internal method
@@ -3659,703 +5067,3 @@ class Structure:
 
             # Return the new structure
             return struct_new
-
-
-    #-------------------------- Write files --------------------------#
-
-
-    def write_pdb_file(self,
-                       pdb_file,
-                       write_conect_data = True,
-                       write_models_records = True):
-        """Write out the structure to a PDB file.
-
-        Parameters
-        ----------
-        pdb_file : ``str``
-            The PDB file where the structure will be written.
-
-        write_conect_data : ``bool``, ``True``
-            Write the CONECT data associated with the structure,
-            if any are present.
-
-        write_models_records : ``bool``, ``True``
-            Write the MODEL and ENDMDL records for each model found
-            in the structure.
-
-            You can set it to ``False`` only if you have one model
-            in the structure. 
-        """
-
-
-        #----------------- Sections' format strings ------------------#
-
-
-        # Get the format string for ATOM records       
-        fmt_atom = \
-            "ATOM  {:5d} {:4s}{:1s}{:3s} {:1s}{:4d}{:1s}   " \
-            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          " \
-            "{:>2s}{:2s}\n"
-
-        # Get the format string for HETATM records
-        fmt_hetatom = \
-            "HETATM{:5d} {:4s}{:1s}{:3s} {:1s}{:4d}{:1s}   " \
-            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          " \
-            "{:>2s}{:2s}\n"
-
-        # Get the format string for MODEL records
-        fmt_model = "MODEL     {:>4}\n"
-
-        # Get the format string for TER records
-        fmt_ter = "TER   {:5d}      {:3s} {:1s}{:4d}\n"
-
-        # Get the format string for ENDMDL records
-        fmt_endmdl = "ENDMDL\n"
-
-
-        #-------------------- Write the PDB file ---------------------#
-
-
-        # Open the output PDB file
-        with open(pdb_file, "w") as out:
-
-
-            #------------- Write the atomic coordinates --------------#
-
-
-            # For each model and associated data
-            for i, (mod, mod_d) in enumerate(self.atom_data.items()):
-
-                # If the models' records need to be written
-                if write_models_records:
-
-                    # Write out the corresponding MODEL record
-                    out.write(fmt_model.format(mod))
-
-                # Otherwise
-                else:
-
-                    # If there are multiple models in the structure
-                    if len(self.atom_data) > 1:
-
-                        # If we are at the first model
-                        if i == 0:
-
-                            # Warn the user
-                            warnstr = \
-                                "Even though 'write_models_header' " \
-                                "is set to 'False', we need to " \
-                                "write the models' records (MODEL " \
-                                "and ENDMDL) because there are " \
-                                "multiple models in the structure."
-                            logger.warning(warnstr)
-
-                        # Write out the records anyway
-                        out.write(fmt_model.format(mod))
-
-                # For each chain and associated data
-                for ch, ch_d in mod_d.items():
-
-                    # For each segment and associated data
-                    for seg, seg_d in ch_d.items():
-
-                        # For each residue and associated data
-                        for res, res_d in seg_d.items():
-
-                            # For each atom and associated data
-                            for atom, atom_d in res_d["atoms"].items():
-
-                                # If we need to write a HETATM record
-                                if atom_d["is_hetatm"]:
-                                    
-                                    # Select the corresponding format
-                                    # string
-                                    fmt_str = fmt_hetatom
-
-                                # If we need to write an ATOM record
-                                else:
-
-                                    # Select the corresponding format
-                                    # string
-                                    fmt_str = fmt_atom
-
-                                # Write out the ATOM/HETATM record
-                                out.write(\
-                                    fmt_str.format(\
-                                        atom,
-                                        atom_d["atom_name"],
-                                        atom_d["alt_loc"],
-                                        res_d["res_name"],
-                                        ch,
-                                        res[0],
-                                        res[1],
-                                        atom_d["x"],
-                                        atom_d["y"],
-                                        atom_d["z"],
-                                        atom_d["occupancy"],
-                                        atom_d["temp_factor"],
-                                        atom_d["element"],
-                                        atom_d["charge"]))
-
-                                # Save the current atom serial to write
-                                # the TER record for the current chain
-                                # (plus one since the TER record has a
-                                # serial one unit higher than the last
-                                # atom of the chain)
-                                ter_atom_serial = atom + 1
-
-                            # Save the current residue number to
-                            # write the TER record for the current
-                            # chain
-                            ter_res_seq = res[0]
-
-                            # Save the current residue name to
-                            # write the TER record for the current
-                            # chain
-                            ter_res_name = res_d["res_name"]
-
-                    # Save the current chain ID to write the
-                    # TER record for the current chain
-                    ter_chain_id = ch
-
-                    # Write out the TER record for the current
-                    # chain
-                    out.write(fmt_ter.format(ter_atom_serial,
-                                             ter_res_name,
-                                             ter_chain_id,
-                                             ter_res_seq))
-
-                # If the models' records need to be written
-                if write_models_records:
-                    
-                    # Write out the ENDMDL record for the current
-                    # model
-                    out.write(fmt_endmdl)
-
-                # Otherwise
-                else:
-
-                    # If there are multiple models in the structure
-                    if len(self.atom_data) > 1:
-
-                        # Write them out anyway (do not warn the
-                        # user here since they have already been
-                        # warned before)
-                        out.write(fmt_model.format(mod))
-
-
-            #----------------- Write the CONECT data -----------------#
-
-
-            # If the user requested the writing of CONECT data
-            if write_conect_data:
-
-                # If there are conect data
-                if self.conect_data is not None:
-
-                    # For each model
-                    for mod in self.conect_data:
-
-                        # For each CONECT record in the model
-                        for atom, rec in self.conect_data[mod].items():
-
-                            # Write out the header
-                            out.write("CONECT")
-
-                            # For each atom in the CONECT record
-                            for a in [atom, *rec]:
-
-                                # Write out the atom
-                                out.write("{:5d}".format(a))
-
-                            # Write out a newline character at the
-                            # end of the record
-                            out.write("\n")
-
-                # Otherwise
-                else:
-
-                    # Warn the user that there are no CONECT data
-                    warnstr = \
-                        "No CONECT data found for the structure."
-                    logger.warning(warnstr)
-
-
-    def write_fasta_file(self,
-                         fasta_file,
-                         split_models = False,
-                         split_chains = False,
-                         disc_chains_mode = "join_with_gaps",
-                         res_i_code = " ",
-                         gap_char = "-",
-                         wrap_at = None,
-                         resnames_3to1 = None):
-        """Write a FASTA file containing the sequence corresponding
-        to the structure.
-
-        Parameters
-        ----------
-        fasta_file : ``str``
-            The FASTA file to be written.
-
-            If ``split_models``, or ``split_chains`` are
-            ``True``, the name of the file is used as a
-            prefix for the multiple FASTA files that will
-            be written.
-
-        split_models : ``bool``, ``True``
-            If ``True``, one FASTA file per model will be
-            written.
-
-            Please refer to the Notes section below for a
-            more detailed explanation of how the different
-            combinations of ``split_models`` and ``split_chains``
-            affect the content of the output FASTA files.
-
-        split_chains : ``bool``, ``True``
-            If ``True``, one FASTA file per chain will be
-            written.
-
-            Please refer to the Notes section below for a
-            more detailed explanation of how the different
-            combinations of ``split_models`` and ``split_chains``
-            affect the content of the output FASTA files.
-
-        disc_chains_mode : ``str``, {``"join"``, \
-            ``"join_with_caps"``, ``"split"``}, ``"join_with_caps"``
-            How to represent discontinuous chains in the FASTA
-            sequences.
-
-            A discontinuous chain is defined as a chain
-            with a discontinuous numbering of its residues.
-
-            If ``"join"``, the discontinuous portions of the
-            chain will be part of the same FASTA sequence,
-            without any indication of the gaps between them.
-
-            If ``"join_with_gaps"``, the discontinuous portions
-            of the chain will be part of the same FASTA sequence,
-            with as many instances of a character indicating
-            a gap (``gap_char``) as there are residues missing
-            between two portions of the chain.
-
-            If ``"split"``, the discontinuous portions of
-            the chain will be written as separate FASTA
-            sequences.
-
-        res_i_code : ``str``, ``" "``
-            The insertion code of the residues that will be
-            included in the FASTA sequences.
-
-            If not provided, the function will consider only
-            residues without an insertion code.
-
-        gap_char : ``str``, ``"-"``
-            The character used to represent gaps in the FASTA
-            sequences, if ``disc_chains_mode = "join_with_caps"``.
-
-        wrap_at : ``int``, optional
-            Wrap each FASTA sequence at ``wrap_at`` characters.
-            
-            If it is not provided, do not wrap the sequences.
-
-        resnames_3to1 : ``dict``, optional
-            A dictionary containing the mapping between the
-            residues' three-letter names and their one-letter
-            name.
-
-            It is used when writing FASTA files from the
-            structure.
-
-            There is no need to pass it if your structure only
-            contains the 20 canonical protein residues, since
-            their mapping is hard-coded. However, if an
-            updated mapping for these residues is provided,
-            the new one is used when writing FASTA files.
-
-        Notes
-        -----
-        If ``split_models = False`` and ``split_chains = False``,
-        the FASTA sequences of all chains of all models will
-        be written in one FASTA file.
-        The file will have the name provided in the ``fasta_file``
-        option.
-
-        If ``split_models = False`` and ``split_chains = True``,
-        one FASTA file per chain will be written, containing
-        the FASTA sequence of that chain in all models.
-        Assuming the ``fasta_file`` option has the form 
-        ``{file_name}.{extension}``, each file will be named
-        ``{file_name}_{chain}.{extension}``.
-
-        If ``split_models = True`` and ``split_chains = False``,
-        one FASTA file per model will be written, containing
-        the FASTA sequences of the chains in that model.
-        Assuming the ``fasta_file`` option has the form 
-        ``{file_name}.{extension}``, each file will be named
-        ``{file_name}_{model}.{extension}``.
-
-        If ``split_models = True`` and ``split_chains = True``,
-        one FASTA file per chain in each model will be written,
-        containing the FASTA sequence of that chain in that
-        model.
-        Assuming the ``fasta_file`` option has the form 
-        ``{file_name}.{extension}``, each file will be named
-        ``{file_name}_{model}_{chain}.{extension}``.
-        """
-
-
-        # Create an empty set to store the files that have
-        # been created
-        files_created = set()
-
-
-        #--------------------- FASTA file's name ---------------------#
-
-
-        # Get the file's name (including the path leading to
-        # it, if any) and the file's extension, separately
-        fasta_name, fasta_ext = \
-            os.path.splitext(fasta_file)
-
-
-        #------------------- FASTA headers' prefix -------------------#
-
-
-        # If the structure has no name
-        if self.name is None:
-
-            # Set the prefix for the FASTA headers to
-            # an empty string
-            prefix = ""
-
-        # Otherwise
-        else:
-
-            # The prefix will contain the name of the structure
-            prefix = f"{self.name}_"
-
-
-        #------------------ Residues' names mapping ------------------#
-
-
-        # If no mapping between the residues' three-letter
-        # names and their one-letter names was passed
-        if resnames_3to1 is None:
-
-            # Set it to the default one
-            resnames_3to1 = self._RESNAMES_3TO1
-
-
-        #----------------- Open file - do not split ------------------#
-
-
-        # If we do not need to split neither models nor chains
-        if not split_models and not split_chains:
-
-            # Set the name of the only FASTA file that will be
-            # written
-            file_name = fasta_file
-
-            # If the file has beem already created
-            if file_name in files_created:
-
-                # Open the file in 'append' mode
-                file_mode = "a"
-
-            # If the file has not been already created
-            else:
-
-                # Open the file in 'write' mode
-                file_mode = "w"
-
-                # Add the name of the file to the set of
-                # files created
-                files_created.add(file_name)
-
-            # Open the file in the selected mode
-            out = open(file_name, file_mode)
-
-
-        #-------------------------- Models ---------------------------#
-
-
-        # For each model and associated data in the
-        # structure
-        for mod, mod_data in self.atom_data.items():
-
-
-            #--------------- Open file - split models ----------------#
-
-
-            # If we need to split models but not chains
-            if split_models and not split_chains:
-
-                # Set the name of the FASTA file for the
-                # current model
-                file_name = f"{fasta_name}_{mod}{fasta_ext}"
-
-                # If the file has beem already created
-                if file_name in files_created:
-
-                    # Open the file in 'append' mode
-                    file_mode = "a"
-
-                # If the file has not been already created
-                else:
-
-                    # Open the file in 'write' mode
-                    file_mode = "w"
-
-                    # Add the name of the file to the set of
-                    # files created
-                    files_created.add(file_name)
-
-                # Open the file in the selected mode
-                out = open(file_name, file_mode)
-
-
-            #------------------------ Chains -------------------------#
-
-            
-            # For each chain and associated data
-            # in the current model
-            for ch, ch_data in mod_data.items():
-
-                # Inizialite a list to store the FASTA
-                # sequences (and corresponding headers)
-                # for the current chain in the current
-                # model
-                fasta_seqs = \
-                    [[f">{prefix}{mod}_{ch}_", ""]]
-
-
-                #--------------------- Segments ----------------------#
-
-
-                # For each chain segment and associated data
-                for seg, seg_data in ch_data.items():
-
-                    # Initialize the variable storing the
-                    # previously visited residue's sequence
-                    # number to None
-                    prev_res_num = None
-
-
-                    #------------------- Residues --------------------#
-
-
-                    # For each residue in the segment
-                    for i, res in enumerate(seg_data):
-
-                        # Get the residue's sequence number and
-                        # insertion code
-                        res_num, i_code = res
-
-                        # If the insertion code is not the one
-                        # of the residues to be considered
-                        if i_code != res_i_code:
-
-                            # Skip the current residue
-                            continue
-
-                        # Get the residue's three-letter name
-                        res_name_3 = seg_data[res]["res_name"]
-
-                        # Try to get the residue's one-letter name
-                        # from its three-letter name
-                        try:
-
-                            res_name_1 = resnames_3to1[res_name_3]
-
-                        # If no one-letter name was found for the
-                        # three-letter name
-                        except KeyError:
-
-                            # Re-raise the error with a more
-                            # verbose message
-                            errstr = \
-                                "No one-letter name found for " \
-                                f"residues of type '{res_name_3}'."
-                            raise KeyError(errstr)
-
-                        # If we are at the first residue of the
-                        # segment
-                        if i == 0:
-
-                            # Update the current chain's sequence
-                            fasta_seqs[-1][1] += \
-                                res_name_1
-
-                            # Update the current chain's header
-                            fasta_seqs[-1][0] += \
-                                f"{res_num}"
-                            
-                            # Set the previous residue to the
-                            # current residue
-                            prev_res_num = res_num
-                            
-                            # Go to the next residue
-                            continue
-
-                        # If we reached a discontinuous point of the
-                        # chain
-                        if res_num > (prev_res_num + 1):
-
-                            # If we should join discontinuous portions
-                            # of the chain without gaps
-                            if disc_chains_mode == "join":
-                                
-                                # Update the current chain's sequence
-                                fasta_seqs[-1][1] += \
-                                    res_name_1
-                                
-                                # Update the current chain's header
-                                # by adding the end of the previous
-                                # chain and the beginning of the
-                                # current one
-                                fasta_seqs[-1][0] += \
-                                    f"-{prev_res_num}_{res_num}"
-
-                            # If we should join discontinuous portions
-                            # of the chain using gaps
-                            elif disc_chains_mode == "join_with_gaps":
-
-                                # Get the appropriate number of gaps
-                                gaps = \
-                                    gap_char * (res_num - prev_res_num)
-
-                                # Update the current chain's sequence
-                                fasta_seqs[-1][1] += \
-                                    gaps + res_name_1
-
-                                # Update the current chain's header
-                                # by adding the end of the previous
-                                # chain and the beginning of the
-                                # current one
-                                fasta_seqs[-1][0] += \
-                                    f"-{prev_res_num}_{res_num}"
-
-                            # If we should split discontinuous portions
-                            # of the chain
-                            elif disc_chains_mode == "split":
-
-                                # Update the current chain's sequence
-                                fasta_seqs.append(\
-                                    [f">{self.name}_{res_num}",
-                                     res_name_1])
-
-                                # Update the previous chain's header
-                                # by adding the end of the previous
-                                # chain
-                                fasta_seqs[-2][0] += \
-                                    f"-{prev_res_num}"
-
-                        # If we are at a continuous point in the chain
-                        else:
-
-                            # Update the current chain's sequence
-                            fasta_seqs[-1][1] += \
-                                res_name_1
-
-                        # If we are at the last residue of the
-                        # segment
-                        if i == len(seg_data) - 1:
-
-                            # Update the current chain's header
-                            # by adding the end of the current
-                            # chain
-                            fasta_seqs[-1][0] += \
-                                f"_{res_num}"
-
-                        # Update the 'previous residue number'
-                        # variable
-                        prev_res_num = res_num
-
-
-                #--------- Open file - split models + chains ---------#
-
-
-                # If we need to split chains and not models
-                if split_models and split_chains:
-
-                    file_name = f"{fasta_name}_{mod}_{ch}{fasta_ext}"
-
-                    # If the file has beem already created
-                    if file_name in files_created:
-
-                        # Open the file in 'append' mode
-                        file_mode = "a"
-
-                    # If the file has not been already created
-                    else:
-
-                        # Open the file in 'write' mode
-                        file_mode = "w"
-
-                        # Add the name of the file to the set of
-                        # files created
-                        files_created.add(file_name)
-
-                    # Open the file in the selected mode
-                    out = open(file_name, file_mode)
-
-
-                #------------- Open file - split chains --------------#
-
-
-                # If we need to split chains but not models
-                elif not split_models and split_chains:
-
-                    file_name = f"{fasta_name}_{ch}{fasta_ext}"
-
-                    # If the file has beem already created
-                    if file_name in files_created:
-
-                        # Open the file in 'append' mode
-                        file_mode = "a"
-
-                    # If the file has not been already created
-                    else:
-
-                        # Open the file in 'write' mode
-                        file_mode = "w"
-
-                        # Add the name of the file to the set of
-                        # files created
-                        files_created.add(file_name)
-
-                    # Open the file in the selected mode
-                    out = open(file_name, file_mode)
-
-
-                #------------- Write header and sequence -------------#
-
-
-                # For each header and associated sequence
-                for fasta_head, fasta_seq in fasta_seqs:
-
-                    # Write out the header
-                    out.write(f"{fasta_head}\n")
-
-                    # If no line wrapping was requested
-                    if wrap_at is None:
-                        
-                        # Write out the entire sequence
-                        out.write(f"{fasta_seq}\n")
-
-                    # Otherwise
-                    else:
-
-                        # Get 'wrap_at'-sized chunks of the
-                        # sequence
-                        fasta_seq_chunks = \
-                            [fasta_seq[i:i + wrap_at] \
-                            for i \
-                            in range(0, len(fasta_seq), wrap_at)]
-
-                        # For each chunk
-                        for fasta_seq_chunk in fasta_seq_chunks:
-
-                            # Write out the chunk
-                            out.write(f"{fasta_seq_chunk}\n")
