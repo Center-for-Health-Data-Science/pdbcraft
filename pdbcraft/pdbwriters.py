@@ -27,6 +27,7 @@
 
 
 # Standard libaray
+from collections import defaultdict
 import logging as log
 # pdbcraft
 from . import _defaults
@@ -231,43 +232,90 @@ class PDBWriter:
 
         #-------------------------------------------------------------#
 
-        # For each model
-        for mod in struct.conect_data:
+        # Helper function to sort the records before writing them
+        def get_sorted_records(conect_data):
+
+            # Initialize an empty dictionary to store the records
+            # sorted by serial
+            sorted_records = defaultdict(lambda: defaultdict(dict))
+
+            # For each model
+            for mod in conect_data:
+
+                # For each connectivity record in the model
+                for atom1, rec in conect_data[mod].items():
+
+                    # Get the serial number for the first atom
+                    atom1_serial = \
+                        struct.atom_serial(path = (mod,) + atom1)
+
+                    # Initialize an empty list to store the bonded
+                    # atoms, sorted in ascending order of serial
+                    # number
+                    sorted_bonded_atoms = []
+
+                    # For each atom in the connectivity record
+                    for atom2, data in rec.items():
+
+                        # Get the serial number for the second atom
+                        atom2_serial = \
+                            struct.atom_serial(path = (mod,) + atom2)
+
+                        # If the bond is a hydrogen bond
+                        if data["conn_type_id"] == "hydrog":
+
+                            # Ignore it
+                            continue
+
+                        # Get how many time we have to write the atom
+                        # from the bond order
+                        times_to_write = \
+                            _defaults.STRUCT_BOND_ORDERS[\
+                                data["pdbx_value_order"]]
+
+                        # For each time we have to write the atom
+                        for time in range(times_to_write):
+
+                            # Add the bonded atom to the list
+                            sorted_bonded_atoms.append(atom2_serial)
+
+                    # Sort the list and save it as a record for the
+                    # current atom
+                    sorted_records[mod][atom1_serial] = \
+                        sorted(sorted_bonded_atoms)
+
+            # Sort the atoms in the dictionary and return it
+            return {mod : \
+                        {atom1 : data for atom1, data \
+                         in sorted(sorted_records[mod].items())} \
+                    for mod in sorted_records}
+
+        #-------------------------------------------------------------#
+
+        # Get the records, sorted
+        sorted_records = \
+            get_sorted_records(conect_data = struct.conect_data)
+
+        #-------------------------------------------------------------#
+
+        # For each model in the sorted records
+        for mod in sorted_records:
 
             # For each connectivity record in the model
-            for atom, rec \
-                in struct.conect_data[mod].items():
-
-                # Get the serial number for the atom
-                atom_serial = \
-                    struct.atom_serial(path = (mod,) + atom)
+            for atom1_serial, rec in sorted_records[mod].items():
 
                 # Write out the header
                 file_handle.write("CONECT")
 
                 # Write out the atom
-                file_handle.write("{:5d}".format(atom_serial))
+                file_handle.write("{:5d}".format(atom1_serial))
 
-                # For each atom in the connectivity
-                # record
-                for bonded_atom, data in rec.items():
+                # For each atom in the connectivity record
+                for atom2_serial in rec:
 
-                    # Get the serial number for the bonded atom
-                    bonded_atom_serial = \
-                        struct.atom_serial(path = (mod,) + bonded_atom)
-
-                    # Get how many time we have to write the atom
-                    # from the bond order
-                    times_to_write = \
-                        _defaults.STRUCT_BOND_ORDERS[\
-                            data["pdbx_value_order"]]
-
-                    # For each time we have to write the atom
-                    for time in range(times_to_write):
-
-                        # Write out the atom
-                        file_handle.write(\
-                            "{:5d}".format(bonded_atom_serial))
+                    # Write out the atom
+                    file_handle.write(\
+                        "{:5d}".format(atom2_serial))
 
                 # Write out a newline character at the
                 # end of the record

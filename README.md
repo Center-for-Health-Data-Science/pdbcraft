@@ -17,11 +17,10 @@ With **pdbcraft**, you can:
 * Rename chains, segments, residues, and atoms.
 * Modify attributes for models, chains, segments, residues, and atoms.
 * Merge structures.
-* Move atoms from one residue, segment, chain, or model to another place in the structure or to a new structure.
 * Sort the atoms of specific residue types according to a custom order.
 * Write a PDB file of your structure.
 * Write a PDBx/MMCIF file of your structure.
-* Write a FASTA file containing the sequences of the chains found in your structure. You can also write multiple FASTA files containing all chains in a specific model, all instances of a specific chain in all models, or each model's chain separately.
+* Write a FASTA file containing the sequences of the chains found in your structure. You can also write multiple FASTA files containing all chains in a specific model, all instances of a particular chain in all models, or each model's chain separately.
 * ... all while your connectivity data gets updated accordingly if present in the original structure.
 
 However, **pdbcraft** does not perform complex tasks such as structural alignments, hydrogen bond detection, or secondary structure assignment.

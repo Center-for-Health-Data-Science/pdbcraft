@@ -685,23 +685,11 @@ class MMCIFWriter:
         """
 
         # Get the unique type symbols per model
-        unique_type_symbols_per_model = \
-            struct._get(action = "get_unique",
-                        level = "atoms",
-                        selected = \
-                            {"atoms" : \
-                                {"_attributes" : ["type_symbol"]}},
-                        squeeze = "models",
-                        elements_type = "attributes")
-
-        #-------------------------------------------------------------#
-
-        # Get the unique type symbols
         unique_type_symbols = \
-            sorted(list(set(\
-                itertools.chain.from_iterable(\
-                    [v for v \
-                     in unique_type_symbols_per_model.values()]))))
+            struct.get_attribute(action = "get_unique",
+                                 attribute = "type_symbol",
+                                 level = "atoms",
+                                 squeeze = "everything")
 
         #-------------------------------------------------------------#
 

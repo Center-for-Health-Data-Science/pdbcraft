@@ -782,18 +782,25 @@ class PDBParser:
 
         #-------------------------------------------------------------#
 
-        # Otherwise
+        # If there are connectivity data
         if conect_data:
 
             # Repeat the connectivity data for as many models
-            # as there are in the structure
-            conect_data = \
-                {mod : conect_data[1] for mod in serials2ids}
+            # as there are in the structure, and return the
+            # connectivity data
+            return \
+                {mod : \
+                    {atom1 : \
+                        {atom2 : data for atom2, data \
+                         in conect_data[mod][atom1].items()} \
+                     for atom1 in conect_data[mod]} \
+                 for mod in serials2ids}
 
-        #-------------------------------------------------------------#
+        # Otherwise
+        else:
 
-        # Return the connectivity data
-        return conect_data
+            # Return an empty dictionary
+            return {}
 
 
     def _get_ssbond_data(self,
@@ -1510,7 +1517,7 @@ class PDBParser:
         # Renumber the atoms since atoms' serial numbers may not
         # be continuous if there were atoms with alternative
         # locations
-        struct._renumber_atoms()
+        struct._update_atom_and_conect()
 
         # Inform the user about the structure's creation
         infostr = \
