@@ -443,7 +443,7 @@ class PDBParser:
 
                     # Get the atom's element's name and convert it
                     # into all uppercase characters
-                    element = line[76:78].strip(" ").upper()
+                    element = line[76:78].strip().upper()
 
                     #-------------------------------------------------#
 

@@ -1040,14 +1040,16 @@ class Structure:
             # Get the first model's identifier
             first_mod = list(oldids2newids.keys())[0]
 
+            # Try to get the depth of the identifiers
             try:
                 
-                # Get the depth of the IDs 
                 depth = \
                     len(list(oldids2newids[first_mod].values())[0])
 
+            # If we are at the models' levels
             except AttributeError:
 
+                # Set the depth to 0
                 depth = 0
 
         #-------------------------------------------------------------#
@@ -1174,6 +1176,12 @@ class Structure:
 
                     #------------------------------------------------#
 
+                    # If we have an empty record
+                    if not atoms_bonded_updated:
+
+                        # Ignore it
+                        continue
+
                     # If the model is already in the dictionary
                     if mod in conect_data_updated:
 
@@ -1194,6 +1202,221 @@ class Structure:
 
             # Update the connectivity data
             self._conect_data = conect_data_updated
+
+
+    def _add_atom(self,
+                  atom_path,
+                  atom_attributes):
+        """Add a single atom to the structure, given the 'path'
+        to the point in the structure where the atom should be
+        added.
+
+        Parameters
+        ----------
+        atom_path : ``tuple``
+            The 'path' to the point in the structure where the atom
+            should be added.
+
+        atom_attributes : ``dict``
+            A dictionary of attributes for the atom.
+        """
+
+
+        #------------------- Define the recursion --------------------#
+        #-------------------------------------------------------------#
+
+
+        def recurse(struct,
+                    atom_attributes,
+                    current_depth = 1,
+                    current_path = ()):
+
+            # If we are at the residues' depth
+            if current_depth == 8:
+
+                # Get the updated atoms for the residue, adding
+                # the one of interest and the corresponding
+                # attributes
+                new_items = \
+                    {**struct["_items"],
+                     **{current_path[0] : \
+                        {"_attributes" : atom_attributes}}}
+
+                # Update the residue's atoms
+                struct["_items"] = new_items
+
+                # Return the residue
+                return struct
+
+            #---------------------------------------------------------#
+
+            # If we are at the models' depth
+            elif current_depth == 1:
+
+                # For each key and associated sub-structure in the
+                # current structure
+                for key, sub_struct in struct.items():
+
+                    # Recurse through the sub-structure without
+                    # updating the current path
+                    struct[key] = \
+                        recurse(struct = sub_struct,
+                                atom_attributes = atom_attributes,
+                                current_depth = current_depth + 1,
+                                current_path = current_path)
+
+            #---------------------------------------------------------#
+
+            # Otherwise
+            else:
+
+                # For each key and associated sub-structure in the
+                # current structure
+                for key, sub_struct in struct.items():
+
+                    # If we are at an '_items' level
+                    if key == "_items":
+
+                        # Recurse through the structure without
+                        # updating the current path
+                        struct[key] = \
+                            recurse(\
+                                struct = sub_struct,
+                                atom_attributes = atom_attributes,
+                                current_depth = current_depth + 1,
+                                current_path = current_path)
+
+                    # Otherwise
+                    elif key == current_path[0]:
+
+                        # Recurse through the sub-structure
+                        struct[key] = \
+                            recurse(\
+                                struct = sub_struct,
+                                atom_attributes = atom_attributes,
+                                current_depth = current_depth + 1,
+                                current_path = current_path[1:])
+
+            #---------------------------------------------------------#
+
+            # Return the structure
+            return struct
+
+
+        #------------------- Check the atom's path -------------------#
+        #-------------------------------------------------------------#
+
+
+        # For each model in the structure
+        for mod in self.atom_data:
+
+            # Try to access the path
+            try:
+
+                self[(mod, *atom_path)]
+
+            # If the path does not exist
+            except KeyError:
+
+                # Raise an error
+                errstr = \
+                    f"Chain '{atom_path[0]}', " \
+                    f"segment '{atom_path[1]}', " \
+                    f"residue '{atom_path[2]}' does not " \
+                    f"exist in model {mod}."
+
+
+        #---------------- Check the atom's attributes ----------------#
+        #-------------------------------------------------------------#
+
+
+        # If the user did not specify the atom's name
+        if "label_atom_id" not in atom_attributes:
+
+            # Raise an error
+            errstr = \
+                "The atom's name must be specified ('label_atom_id')."
+            raise KeyError(errstr)
+
+        # If the user did not specify the atom's alternative location
+        if "label_alt_id" not in atom_attributes:
+
+            # Set it to an empty string
+            atom_attributes["label_alt_id"] = ""
+
+        # If the user did not specify the atom's entity ID
+        if "label_entity_id" not in atom_attributes:
+
+            # Set it to an empty string
+            atom_attributes["label_entity_id"] = ""
+
+        # If the user did not specify the atom's type
+        if "type_symbol" not in atom_attributes:
+
+            # Raise an error
+            errstr = \
+                "The atom's type must be specified ('type_symbol')."
+            raise KeyError(errstr)
+
+        # If the user did not specify the X coordinate of the atom's
+        # position
+        if "Cartn_x" not in atom_attributes:
+
+            # Raise an error
+            errstr = \
+                "The X coordinate of the atom's position must be " \
+                "specified ('Cartn_x')."
+            raise KeyError(errstr)
+
+        # If the user did not specify the Y coordinate of the atom's
+        # position
+        if "Cartn_y" not in atom_attributes:
+
+            # Raise an error
+            errstr = \
+                "The Y coordinate of the atom's position must be " \
+                "specified ('Cartn_y')."
+            raise KeyError(errstr)
+
+        # If the user did not specify the Z coordinate of the atom's
+        # position
+        if "Cartn_z" not in atom_attributes:
+
+            # Raise an error
+            errstr = \
+                "The Z coordinate of the atom's position must be " \
+                "specified ('Cartn_z')."
+            raise KeyError(errstr)
+
+        # If the user did not specify the atom's formal charge
+        if "pdbx_formal_charge" not in atom_attributes:
+
+            # Set it to an empty string
+            atom_attributes["pdbx_formal_charge"] = ""
+
+
+        #----------------------- Add the atom ------------------------#
+        #-------------------------------------------------------------#
+
+
+        # Get the serial number of the last atom
+        last_atom = self.get_items(action = "get_max",
+                                   level = "atoms",
+                                   squeeze = "everything")
+
+        # Recursively modify the structure
+        self._atom_data = \
+            recurse(struct = copy.deepcopy(self.atom_data),
+                    atom_attributes = atom_attributes,
+                    current_path = atom_path + (last_atom+1,))
+
+
+        #-------------------- Update atom/conect ---------------------#
+        #-------------------------------------------------------------#
+
+
+        # Renumber the atoms (it also updates the connectivity data)
+        self._update_atom_and_conect()
 
 
     def _get(self,
@@ -2997,7 +3220,9 @@ class Structure:
 
                     # Get the current model, chain, segment,
                     # and residue
-                    model, chain, segment, residue = current_path
+                    model, chain, segment, residue = \
+                        current_path[0], current_path[2], \
+                        current_path[4], current_path[5]
 
                     # Warn the user
                     warnstr = \
@@ -3763,6 +3988,80 @@ class Structure:
 
         # Return the result
         return self._get(**kwargs)
+
+
+    #-------------------------- Add an atom --------------------------#
+
+
+    def add_atom(self,
+                 atom_path,
+                 atom_attributes,
+                 in_place = False):
+        """Add a single atom to the structure, given the 'path'
+        to a point in the structure where the atom should be added.
+
+        The 'path' comprises the identifier of the chain, segment,
+        and residue the atom should be added to.
+
+        Parameters
+        ----------
+        atom_path : ``tuple``
+            The path to the point in the structure where the atom
+            should be added.
+
+        atom_attributes : ``dict``
+            A dictionary containing the attributes for the atom.
+            
+            The dictionary must contain at least the following
+            keys:
+
+            - 'label_atom_id', associated with the atom's name.
+            - 'label_alt_id', associated with the atom's alternate
+              location.
+            - 'label_entity_id', associated with the atom's
+              entity ID.
+            - 'type_symbol', associated with the atom's type.
+            - 'Cartn_x', associated with the X coordinate of the
+              atom's position.
+            - 'Cartn_y', associated with the Y coordinate of the
+              atom's position.
+            - 'Cartn_z', associated with the Z coordinate of the
+              atom's position.
+            - 'pdbx_formal_charge', associated with the atom's
+              charge.
+
+        in_place : ``bool``, ``False``
+            Whether to modify the structure in place. If ``False``,
+            a new ``Structure`` will be returned.
+
+        Returns
+        -------
+        ``pdbcraft.Structure`` if ``in_place = False``; otherwise,
+        ``None``
+        """
+
+        # Set the keyword arguments to pass to the internal method
+        kwargs = \
+            {"atom_path" : atom_path,
+             "atom_attributes" : atom_attributes}
+
+        # If the structure needs to be modified in place
+        if in_place:
+            
+            # Add the atom to the structure
+            self._add_atom(**kwargs)
+
+        # Otherwise
+        else:
+
+            # Create a copy of the current structure
+            struct_new = self.get_copy()
+
+            # Add the atom to the new structure
+            struct_new._add_atom(**kwargs)
+
+            # Return the new structure
+            return struct_new
 
 
     #-------------------------- Keep items ---------------------------#

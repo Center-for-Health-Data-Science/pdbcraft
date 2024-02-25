@@ -198,7 +198,7 @@ MMCIF_CATEGORIES = \
          "group_PDB" : \
             (str, None, {"ATOM", "HETATM"}, True, None),
          
-         # The value of _atom_site.id must uniquely identify a
+         # The value of '_atom_site.id' must uniquely identify a
          # record in the '_atom_site' list
          "id" : \
             (int, None, None, True, None),
