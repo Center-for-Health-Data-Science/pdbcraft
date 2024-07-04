@@ -26,13 +26,16 @@
 #    Floor, Boston, MA  02110-1301, USA.
 
 
-# Import everything from the parsers' modules
+# Import everything from the parsers' modules.
 from .mmcifparsers import *
 from .pdbparsers import *
 
-# Import everything from the structure module
+# Import everything from the structure module.
 from .structure import *
 
-# Import everything from the writers' modules
+# Import everything from the writers' modules.
 from .mmcifwriters import *
 from .pdbwriters import *
+
+# Import everything from the 'util' module.
+from .util import *

@@ -5,7 +5,7 @@
 #
 #    pdbcraft setup.
 #
-#    Copyright (C) 2023 Valentina Sora 
+#    Copyright (C) 2024 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software: you can redistribute it and/or
@@ -23,33 +23,33 @@
 #    If not, see <http://www.gnu.org/licenses/>.
 
 
-# Standard library
+# Import from the standard library.
 from setuptools import setup
 
 
-# The name of the project
+# Set the name of the project.
 name = "pdbcraft"
 
-# The URL where to find the project
+# Set the URL where to find the project.
 url = \
     f"https://github.com/Center-for-Health-Data-Science/" \
     f"{name}"
 
-# The project's author(s)
+# Set the project's author(s).
 author = "Valentina Sora"
 
-# The project's version
+# Set the project's version.
 version = "0.0.1"
 
-# A brief description of the project
+# Set a brief description of the project.
 description = \
     "A lightweight Python package for parsing and manipulating " \
-    "PDB files."
+    "PDB and PDBx/mmCIF files."
 
-# Which packages are included
+# Set which packages are included.
 packages = ["pdbcraft"]
 
-# Run the setup
+# Run the setup.
 setup(name = name,
       url = url,
       author = author,

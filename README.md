@@ -6,7 +6,7 @@
 
 **pdbcraft** is a lightweight Python package for parsing and manipulating PDB and PDBx/MMCIF files.
 
-**pdbcraft** has no external dependencies and stores data in simple data structures (nested dictionaries) that can be easily modified with external tools if needed.
+**pdbcraft** has no external dependencies and stores data in simple data structures (nested dictionaries) that can be easily modified with external tools.
 
 With **pdbcraft**, you can:
 
@@ -14,14 +14,14 @@ With **pdbcraft**, you can:
 * Remove selected models, chains, segments, residues, and atoms.
 * Keep only selected models, chains, segments, residues, and atoms.
 * Renumber models and residues.
-* Rename chains, segments, residues, and atoms.
+* Rename models, chains, segments, residues, and atoms.
 * Modify attributes for models, chains, segments, residues, and atoms.
 * Merge structures.
 * Sort the atoms of specific residue types according to a custom order.
 * Write a PDB file of your structure.
 * Write a PDBx/MMCIF file of your structure.
 * Write a FASTA file containing the sequences of the chains found in your structure. You can also write multiple FASTA files containing all chains in a specific model, all instances of a particular chain in all models, or each model's chain separately.
-* ... all while your connectivity data gets updated accordingly if present in the original structure.
+* ... all while your connectivity data gets updated accordingly if present in the original structure(s).
 
 However, **pdbcraft** does not perform complex tasks such as structural alignments, hydrogen bond detection, or secondary structure assignment.
 
@@ -56,6 +56,8 @@ To install **pdbcraft**:
 ## Documentation
 
 Detailed **documentation**, with a description of the API and full-fledged tutorials, is under construction and will soon be available on ReadTheDocs.
+
+For now, the documentation is available as HTML files in the `pdbcraft/doc/build` directory.
 
 ## Bug reports
 

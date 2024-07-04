@@ -26,10 +26,34 @@
 #    Floor, Boston, MA  02110-1301, USA.
 
 
+#######################################################################
+
+
+# Set the module's description.
+__doc__ = "Private default/constant values."
+
+
+#######################################################################
+
+
+# Import from the standard library.
+import os
+
+
+#######################################################################
+
+
+#------------------- Directories-related defaults --------------------#
+
+
+# Set the path to the directories containing example structures.
+EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "examples")
+
+
 #-------------------- Structure-related defaults ---------------------#
 
 
-# Which residues are considered protein, DNA, or RNA residues
+# Set which residues are considered protein, DNA, or RNA residues.
 STRUCT_RESNAMES = \
   {# Protein residues
    "protein" : \
@@ -41,22 +65,22 @@ STRUCT_RESNAMES = \
        "HIE", "HID", "HIP"},
    # DNA residues
    "dna" : \
-      {"A", "C", "G", "U"},
+      {"DA", "DC", "DG", "DT"},
    # RNA residues
    "rna" : \
-      {"DA", "DC", "DG", "DT"}}
+      {"A", "C", "G", "U"}}
 
-# Which keywords are supported to indicate a bond's order in
-# the connectivity data. These keywords constitute the controlled
+# Set which keywords are supported to indicate a bond's order in the
+# connectivity data. These keywords constitute the controlled
 # vocabulary for the '_struct_conn.pdbx_value_order' item of
-# mmCIF files
+# mmCIF files.
 STRUCT_BOND_ORDERS = \
   {"sing" : 1, "doub" : 2, "trip" : 3, "quad" : 4}
 
-# Which keywords are supported to indicate a bond's type in
-# the connectivity data. Thess keywords constitute the controlled
+# Set which keywords are supported to indicate a bond's type in the
+# connectivity data. Thess keywords constitute the controlled
 # vocabulary for the '_struct_conn.conn_type_id' item of
-# mmCIF files
+# mmCIF files.
 STRUCT_BOND_TYPES = \
     {"covale", "disulf", "hydrog", "metalc"}
 
@@ -64,22 +88,32 @@ STRUCT_BOND_TYPES = \
 #---------------------- FASTA-related defaults -----------------------#
 
 
-# A mapping between residues' three-letter names and residues'
-# one-letter names (canonical residues + histidine
-# protonation states)
-FASTA_RESNAMES_3TO1 = \
-    {"ALA" : "A", "CYS" : "C", "ASP" : "D", "GLU" : "E",
+# Define a mapping between residues' and bases' long-form names and
+# short-form names.
+FASTA_RESNAMES_MAPPING = \
+    {# Protein residues
+     "ALA" : "A", "CYS" : "C", "ASP" : "D", "GLU" : "E",
      "PHE" : "F", "GLY" : "G", "HIS" : "H", "ILE" : "I",
      "LYS" : "K", "LEU" : "L", "MET" : "M", "ASN" : "N",
      "PRO" : "P", "GLN" : "Q", "ARG" : "R", "SER" : "S",
      "THR" : "T", "VAL" : "V", "TRP" : "W", "TYR" : "Y",
-     "HIE" : "H", "HID" : "H", "HIP" : "H"}
+     "HIE" : "H", "HID" : "H", "HIP" : "H",
+     # DNA bases
+     "DA" : "A",
+     "DC" : "C",
+     "DG" : "G",
+     "DT" : "T",
+     # RNA bases
+     "A" : "A",
+     "U" : "U",
+     "C" : "C",
+     "G" : "G"}
 
 
 #----------------------- PDB-related defaults ------------------------#
 
 
-# The format strings to use for each record type in PDB files
+# Set the format strings to use for each record type in PDB files.
 PDB_SECTIONS = \
     {"ATOM" : \
         "ATOM  {:5d} {:4s}{:1s}{:3s} {:1s}{:4d}{:1s}   " \
@@ -103,29 +137,30 @@ PDB_SECTIONS = \
 
 #---------------------- mmCIF-related defaults -----------------------#
 
-# The directive indicating the beginning of a data block
-# in mmCIF files
+
+# Set the directive indicating the beginning of a data block in mmCIF
+# files.
 MMCIF_DATA_DIRECTIVE = "data_"
 
-# The directive indicating the beginning of a loop section
-# in mmCIF files
+# Set the directive indicating the beginning of a loop section in mmCIF
+# files.
 MMCIF_LOOP_DIRECTIVE = "loop_"
 
-# The characters used as quotes in mmCIF files
+# Set the characters used as quotes in mmCIF files.
 MMCIF_QUOTE_CHARACTERS = ["'", '"']
 
-# The characters used to delimit white spaces in mmCIF files
+# Set the characters used to delimit white spaces in mmCIF files.
 MMCIF_WHITESPACE_CHARACTERS = [" ", "\t"]
 
-# The characters used to specify unassigned values in mmCIF files
+# Set the characters used to specify unassigned values in mmCIF files.
 MMCIF_UNASSIGNED_CHARACTERS = [".", "?"]
 
-# The character used at the beginning of lines to indicate
-# comments in mmCIF files
+# Set the character used at the beginning of lines to indicate
+# comments in mmCIF files.
 MMCIF_COMMENT_CHARACTER = "#"
 
-# The character used at the beginning of lines to indicate
-# a multi-line quoted string
+# Set the character used at the beginning of lines to indicate a
+# multi-line quoted string.
 MMCIF_MULTILINE_CHARACTER = ";"
 
 # The 'MMCIF_CATEGORIES' dictionary is a nested dictionary with
@@ -175,7 +210,7 @@ MMCIF_CATEGORIES = \
 
          # The code used to identify the atom species (singular
          # or plural) representing this atom type. Normally this
-         # code is the element symbol
+         # code is the element symbol.
          "symbol" : \
             (str, None, None, True, None),
       },
@@ -188,98 +223,98 @@ MMCIF_CATEGORIES = \
      # https://mmcif.wwpdb.org/dictionaries/
      # mmcif_pdbx_v50.dic/Categories/atom_site.html
      #
-     # We excluded the '_pdbx_refine_tls_group.id' data item
+     # We excluded the '_pdbx_refine_tls_group.id' data item.
      "_atom_site" : {\
          
          # The group of atoms to which the atom site belongs.
          # This data item is provided for compatibility with the
          # original Protein Data Bank format, and only for that
-         # purpose
+         # purpose.
          "group_PDB" : \
             (str, None, {"ATOM", "HETATM"}, True, None),
          
          # The value of '_atom_site.id' must uniquely identify a
-         # record in the '_atom_site' list
+         # record in the '_atom_site' list.
          "id" : \
             (int, None, None, True, None),
          
-         # A pointer to 'symbol' in the '_atom_type' category
+         # A pointer to 'symbol' in the '_atom_type' category.
          "type_symbol" : \
             (str, None, ("_atom_type", "symbol"), False, None),
          
-         # A pointer to 'atom_id' in the '_chem_comp_atom' category
+         # A pointer to 'atom_id' in the '_chem_comp_atom' category.
          "label_atom_id" : \
             (str, None, ("_chem_comp_atom", "atom_id"), True, None),
          
-         # A pointer to 'id' in the '_atom_sites_alt' category
+         # A pointer to 'id' in the '_atom_sites_alt' category.
          "label_alt_id" : \
             (str, None, None, True, None),
          
-         # A pointer to 'id' in the '_chem_comp' category
+         # A pointer to 'id' in the '_chem_comp' category.
          "label_comp_id" : \
             (str, None, ("_chem_comp", "id"), True, None),
          
-         # A pointer to 'id' in the '_struct_asym' category
+         # A pointer to 'id' in the '_struct_asym' category.
          "label_asym_id" : \
             (str, None, None, True, None),
          
-         # A pointer to 'id' in the '_entity' category
+         # A pointer to 'id' in the '_entity' category.
          "label_entity_id" : \
             (int, None, ("_entity", "id"), True, None),
          
-         # A pointer to 'num' in the '_entity_poly_seq' category
+         # A pointer to 'num' in the '_entity_poly_seq' category.
          "label_seq_id" : \
             (int, None, ("_entity_poly_seq", "num"), True, None),
          
-         # The PDB insertion code
+         # The PDB insertion code.
          "pdbx_PDB_ins_code" : \
             (str, None, None, False, None),
          
          # The x atom-site coordinate in angstroms specified
          # according to a set of orthogonal Cartesian axes related
          # to the cell axes as specified by the description given
-         # in '_atom_sites.Cartn_transform_axes'
+         # in '_atom_sites.Cartn_transform_axes'.
          "Cartn_x" : \
             (float, 3, None, True, None),
          
          # The y atom-site coordinate in angstroms specified
          # according to a set of orthogonal Cartesian axes related
          # to the cell axes as specified by the description given
-         # in '_atom_sites.Cartn_transform_axes'
+         # in '_atom_sites.Cartn_transform_axes'.
          "Cartn_y" : \
             (float, 3, None, True, None),
          
          # The z atom-site coordinate in angstroms specified
          # according to a set of orthogonal Cartesian axes related
          # to the cell axes as specified by the description given
-         # in '_atom_sites.Cartn_transform_axes'
+         # in '_atom_sites.Cartn_transform_axes'.
          "Cartn_z": \
             (float, 3, None, True, None),
          
          # The fraction of the atom type present at this site.
          # The sum of the occupancies of all the atom types at
          # this site may not significantly exceed 1.0 unless it
-         # is a dummy site
+         # is a dummy site.
          "occupancy" : \
             (float, 2, None, False, None),
          
          # The isotropic atomic displacement parameter,
          # or equivalent isotropic atomic displacement parameter,
          # B_eq, calculated from the anisotropic displacement
-         # parameters
+         # parameters.
          "B_iso_or_equiv" : \
             (float, 2, None, False, None),
          
          # The net integer charge assigned to this atom. This is
          # the formal charge assignment normally found in
-         # chemical diagrams
+         # chemical diagrams.
          "pdbx_formal_charge" : \
             (float, 2, [-8, 8], False, None),
          
          # An alternative identifier for '_atom_site.label_seq_id'
          # that may be provided by an author in order to match the
          # identification used in the publication that describes
-         # the structure
+         # the structure.
          "auth_seq_id" : \
             (int, None, None, False, None),
          
@@ -293,33 +328,33 @@ MMCIF_CATEGORIES = \
          # An alternative identifier for '_atom_site.label_asym_id'
          # that may be provided by an author in order to match the
          # identification used in the publication that describes
-         # the structure
+         # the structure.
          "auth_asym_id" : \
             (str, None, None, False, None),
          
          # An alternative identifier for '_atom_site.label_atom_id'
          # that may be provided by an author in order to match the
          # identification used in the publication that describes
-         # the structure
+         # the structure.
          "auth_atom_id" : \
             (str, None, None, False, None),
          
-         # The PDB model number
+         # The PDB model number.
          "pdbx_PDB_model_num" : \
             (int, None, [0.0, float("inf")], False, None),
          
          # The standard uncertainty (estimated standard deviation)
-         # of '_atom_site.Cartn_x'
+         # of '_atom_site.Cartn_x'.
          "Cartn_x_esd" : \
             (float, 2, None, False, None),
          
          # The standard uncertainty (estimated standard deviation)
-         # of '_atom_site.Cartn_y'
+         # of '_atom_site.Cartn_y'.
          "Cartn_y_esd" : \
             (float, 2, None, False, None),
          
          # The standard uncertainty (estimated standard deviation)
-         # of '_atom_site.Cartn_z'
+         # of '_atom_site.Cartn_z'.
          "Cartn_z_esd" : \
             (float, 2, None, False, None),
          
@@ -329,7 +364,7 @@ MMCIF_CATEGORIES = \
             (float, 2, None, False, None),
          
          # The standard uncertainty (estimated standard deviation)
-         # of '_atom_site.B_iso_or_equiv'
+         # of '_atom_site.B_iso_or_equiv'.
          "B_iso_or_equiv_esd" : \
             (float, 2, None, False, None),
          
@@ -351,7 +386,7 @@ MMCIF_CATEGORIES = \
      "_atom_sites_alt" : {\
 
          # This value must uniquely identify a record in the
-         # '_atom_sites_alt' list
+         # '_atom_sites_alt' list.
          "id" : \
             (str, None, None, True, None),
          },
@@ -366,32 +401,32 @@ MMCIF_CATEGORIES = \
      "_chem_comp" : {\
 
          # This value must uniquely identify each item in the
-         # '_chem_comp' list
+         # '_chem_comp' list.
          "id" : \
             (str, None, None, True, None),
          
-         # The formula for the chemical component
+         # The formula for the chemical component.
          "formula" : \
             (str, None, None, False, None),
          
-         # Formula mass in daltons of the chemical component
+         # Formula mass in daltons of the chemical component.
          "formula_weight" : \
             (float, None, None, [1.0, float("inf"), False, None]),
          
          # 'yes' indicates that this is a 'standard' monomer,
-         # 'no' indicates that it is 'nonstandard'
+         # 'no' indicates that it is 'nonstandard'.
          "mon_nstd_flag" : \
             (str, None, None, {"n", "no", "y", "yes"}, False, None),
          
-         # The full name of the component
+         # The full name of the component.
          "name" : \
             (str, None, None, False, None),
          
-         # Synonym list for the component
+         # Synonym list for the component.
          "pdbx_synonyms" : \
             (str, None, None, False, None),
          
-         # For standard polymer components, the type of the monomer
+         # For standard polymer components, the type of the monomer.
          "type" : \
             (str, None, {"D-beta-peptide, C-gamma linking",
                          "D-gamma-peptide, C-delta linking",
@@ -426,74 +461,72 @@ MMCIF_CATEGORIES = \
 
      #----------------------------------------------------------------#
 
-     # The fields reported are those flagged as "used in current
-     # PDB entries" in:
+     # The fields reported are those flagged as "used in current PDB
+     # entries" in:
      #
      # https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/
      # Categories/chem_comp_atom.html
      "_chem_comp_atom" : {\
 
-         # This value must uniquely identify each atom in
-         # each monomer in the '_chem_comp_atom' list
+         # This value must uniquely identify each atom in each monomer
+         # in the '_chem_comp_atom' list.
          "atom_id" : \
             (str, None, None, True, None),
          
-         # A pointer to 'id' in the '_chem_comp' category
+         # A pointer to 'id' in the '_chem_comp' category.
          "comp_id" : \
             (str, None, ("_chem_comp", "id"), True, None),
          
          # The code used to identify the atom species representing
-         # this atom type. Normally, this code is the element
-         # symbol
+         # this atom type. Normally, this code is the element symbol.
          "type_symbol" : \
             (str, None, None, False, None),
          },
 
      #----------------------------------------------------------------#
 
-     # The fields reported are those flagged as "used in current
-     # PDB entries" in:
+     # The fields reported are those flagged as "used in current PDB
+     # entries" in:
      #
      # https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/
      # Categories/entity.html
      "_entity" : {\
 
-         # This value must uniquely identify a record in the
-         # '_entity' category
+         # This value must uniquely identify a record in the '_entity'
+         # category.
          "id" : \
             (str, None, None, True, None),
          
-         # A description of special aspects of the entity
+         # A description of special aspects of the entity.
          "details" : \
             (str, None, None, False, None),
          
-         # The formula mass in daltons of the entity
+         # The formula mass in daltons of the entity.
          "formula_weight" : \
             (float, None, [1.0, float("inf")], False, None),
          
-         # The enzyme Commission (EC) number(s)
+         # The enzyme Commission (EC) number(s).
          "pdbx_ec" : \
             (str, None, None, False, None),
          
-         # The entity fragment description(s)
+         # The entity fragment description(s).
          "pdbx_fragment" : \
             (str, None, None, False, None),
          
-         # Details about any entity mutation(s)
+         # Details about any entity mutation(s).
          "pdbx_mutation" : \
             (str, None, None, False, None),
          
-         # A placeholder for the number of molecules of the
-         # entity in the entry
+         # A placeholder for the number of molecules of the entity
+         # in the entry.
          "pdbx_number_of_molecules" : \
             (int, None, None, False, None),
          
-         # The method by which the sample for the entity was
-         # produced
+         # The method by which the sample for the entity was produced.
          "src_method" : \
             (str, None, {"man", "nat", "syn"}, False, None),
          
-         # This value defines the type of the entity
+         # This value defines the type of the entity.
          "type" : \
             (str, None, {"branched", "macrolide", "non-polymer",
                          "polymer", "water"},
@@ -502,170 +535,169 @@ MMCIF_CATEGORIES = \
 
      #----------------------------------------------------------------#
 
-     # The fields reported are all those in "used in current
-     # PDB entries" in:
+     # The fields reported are all those in "used in current PDB
+     # entries" in:
      #
      # https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/
      # Categories/entity_poly_seq.html
      "_entity_poly_seq" : {\
 
-         # This value must uniquely and sequentially identify
-         # a record in the '_entity_poly_seq' list
+         # This value must uniquely and sequentially identify a record
+         # in the '_entity_poly_seq' list.
          "num" : \
             (int, None, None, True, None),
 
-         # A pointer to 'id' in the '_entity' category
+         # A pointer to 'id' in the '_entity' category.
          "entity_id" : \
             (str, None, ("_entity", "id"), True, None),
          
-         # A pointer to 'id' in the '_chem_comp' category
+         # A pointer to 'id' in the '_chem_comp' category.
          "mon_id" : \
             (str, None, ("_chem_comp", "id"), True, None),
          
-         # A flag to indicate whether this monomer in the
-         # polymer is heterogeneous in sequence.
+         # A flag to indicate whether this monomer in the polymer is
+         # heterogeneous in sequence.
          "hetero" : \
             (str, None, {"n", "no", "y", "yes"}, False, None),
          },
 
      #----------------------------------------------------------------#
      
-     # The fields reported are those flagged as "used in current
-     # PDB entries" in:
+     # The fields reported are those flagged as "used in current PDB
+     # entries" in:
      #
      # https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/
      # Categories/struct_conn.html
      "_struct_conn" : {\
 
-         # The value of '_struct_conn.id' must uniquely identify
-         # a record in the '_struct_conn' category
+         # The value of '_struct_conn.id' must uniquely identify a
+         # record in the '_struct_conn' category.
          "id" : \
             (str, None, None, True, None),
          
-         # A pointer to 'id' in the '_struct_conn_type' category
+         # A pointer to 'id' in the '_struct_conn_type' category.
          "conn_type_id" : \
             (str, None, ("_struct_conn_type", "id"), True, None),
          
          # This data item identifies if the linkage has displaced
-         # leaving atoms on both, one or none of the connected
-         # atoms forming the linkage. Leaving atoms are defined
-         # within their chemical defintions of each
-         # connected component
+         # leaving atoms on both, one or none of the connected atoms
+         # forming the linkage. Leaving atoms are defined within their
+         # chemical defintions of each connected component.
          "pdbx_leaving_atom_flag" : \
             (str, None, {"both", "none", "one"}, False, None),
          
-         # A pointer to 'auth_asym_id' in the '_atom_site' category
+         # A pointer to 'auth_asym_id' in the '_atom_site' category.
          "ptnr1_label_asym_id" : \
             (str, None, ("_atom_site", "label_asym_id"), True, None),
          
-         # A pointer to 'label_comp_id' in the '_atom_site' category
+         # A pointer to 'label_comp_id' in the '_atom_site' category.
          "ptnr1_label_comp_id" : \
             (str, None, ("_atom_site", "label_comp_id"), True, None),
          
-         # A pointer to 'label_seq_id' in the '_atom_site' category
+         # A pointer to 'label_seq_id' in the '_atom_site' category.
          "ptnr1_label_seq_id" : \
             (int, None, ("_atom_site", "label_seq_id"), True, None),
          
-         # A pointer to 'atom_id' in the '_chem_comp_atom' category
+         # A pointer to 'atom_id' in the '_chem_comp_atom' category.
          "ptnr1_label_atom_id" : \
             (str, None, ("_chem_comp_atom", "atom_id"), True, None),
          
-         # A pointer to 'label_alt_id' in the '_atom_site' category
+         # A pointer to 'label_alt_id' in the '_atom_site' category.
          "pdbx_ptnr1_label_alt_id" : \
             (str, None, ("_atom_site", "label_alt_id"), True, None),
          
          # A pointer to 'pdbx_PDB_ins_code' in the '_atom_site'
-         # category
+         # category.
          "pdbx_ptnr1_PDB_ins_code" : \
             (str, None, ("_atom_site", "pdbx_PDB_ins_code"), 
              True, None),
          
-         # This value describes the symmetry operation that
-         # should be applied to the atom set specified by
-         # '_struct_conn.ptnr1_label*' to generate the
-         # first partner in the structure connection
+         # This value describes the symmetry operation that should be
+         # applied to the atom set specified by
+         # '_struct_conn.ptnr1_label*' to generate the first partner
+         # in the structure connection.
          "ptnr1_symmetry" : \
             (str, None, None, False, None),
          
-         # A pointer to 'auth_asym_id' in the '_atom_site' category
+         # A pointer to 'auth_asym_id' in the '_atom_site' category.
          "ptnr2_label_asym_id" : \
             (str, None, ("_atom_site", "label_asym_id"), True, None),
          
-         # A pointer to 'label_comp_id' in the '_atom_site' category
+         # A pointer to 'label_comp_id' in the '_atom_site' category.
          "ptnr2_label_comp_id" : \
             (str, None, ("_atom_site", "label_comp_id"), True, None),
          
-         # A pointer to 'label_seq_id' in the '_atom_site' category
+         # A pointer to 'label_seq_id' in the '_atom_site' category.
          "ptnr2_label_seq_id" : \
             (int, None, ("_atom_site", "label_seq_id"), True, None),
          
-         # A pointer to 'atom_id' in the '_chem_comp_atom' category
+         # A pointer to 'atom_id' in the '_chem_comp_atom' category.
          "ptnr2_label_atom_id" : \
             (str, None, ("_chem_comp_atom", "atom_id"), True, None),
          
-         # A pointer to 'label_alt_id' in the '_atom_site' category
+         # A pointer to 'label_alt_id' in the '_atom_site' category.
          "pdbx_ptnr2_label_alt_id" : \
             (str, None, ("_atom_site", "label_alt_id"), True, None),
          
          # A pointer to 'pdbx_PDB_ins_code' in the '_atom_site'
-         # category
+         # category.
          "pdbx_ptnr2_PDB_ins_code" : \
             (str, None, ("_atom_site", "pdbx_PDB_ins_code"), 
              True, None),
          
          # A pointer to 'auth_asym_id' in the '_atom_site' category
-         # for partner 1
+         # for partner 1.
          "ptnr1_auth_asym_id" : \
             (str, None, None, False, None),
          
          # A pointer to 'auth_comp_id' in the '_atom_site' category
-         # for partner 1
+         # for partner 1.
          "ptnr1_auth_comp_id" : \
             (str, None, None, False, None),
          
          # A pointer to 'auth_seq_id' in the '_atom_site' category
-         # for partner 1
+         # for partner 1.
          "ptnr1_auth_seq_id" : \
             (int, None, None, False, None),
          
          # A pointer to 'auth_asym_id' in the '_atom_site' category
-         # for partner 2
+         # for partner 2.
          "ptnr2_auth_asym_id" : \
             (str, None, None, False, None),
          
          # A pointer to 'auth_comp_id' in the '_atom_site' category
-         # for partner 2
+         # for partner 2.
          "ptnr2_auth_comp_id" : \
             (str, None, None, False, None),
          
          # A pointer to 'auth_seq_id' in the '_atom_site' category
-         # for partner 2
+         # for partner 2.
          "ptnr2_auth_seq_id" : \
             (int, None, None, False, None),
          
-         # This value describes the symmetry operation that
-         # should be applied to the atom set specified by
-         # '_struct_conn.ptnr2_label*' to generate the
-         # second partner in the structure connection
+         # This value describes the symmetry operation that should be
+         # applied to the atom set specified by
+         # '_struct_conn.ptnr2_label*' to generate the second partner
+         # in the structure connection.
          "ptnr2_symmetry" : \
             (str, None, None, False, None),
          
-         # A description of special aspects of the connection 
+         # A description of special aspects of the connection.
          "details" : \
             (str, None, None, False, None),
          
-         # The distance value for this contact
+         # The distance value for this contact.
          "pdbx_dist_value" : \
             (float, 3, None, False, None),
          
-         # The chemical or structural role of the interaction
+         # The chemical or structural role of the interaction.
          "pdbx_role" : \
             (str, None, {"C-Mannosylation", "N-Glycosylation",
                          "O-Glycosylation", "S-Glycosylation"},
              False, None),
          
-         # The chemical bond order associated with the specified
-         # atoms in this contact
+         # The chemical bond order associated with the specified atoms
+         # in this contact.
          "pdbx_value_order" : \
             (str, None, {"doub", "quad", "sing", "trip"}, 
              True, "sing"),
@@ -679,7 +711,7 @@ MMCIF_CATEGORIES = \
      # Categories/struct_conn_type.html
      "_struct_conn_type" : {\
          
-         # The chemical or structural type of the interaction
+         # The chemical or structural type of the interaction.
          "id" : \
             (str, None, {"covale", "covale_base", 
                          "covale_phosphate", "covate_sugar",
@@ -687,12 +719,12 @@ MMCIF_CATEGORIES = \
                          "mismat", "modres", "saltbr"},
              True, None),
          
-         # The criteria used to define the interaction
+         # The criteria used to define the interaction.
          "criteria" : \
             (str, None, None, False, None),
          
-         # A reference that specifies the criteria used to define
-         # the interaction
+         # A reference that specifies the criteria used to define the
+         # interaction.
          "reference" : \
             (str, None, None, False, None),
          },
