@@ -57,7 +57,7 @@ To install **pdbcraft**:
 
 Detailed **documentation**, with a description of the API and full-fledged tutorials, is under construction and will soon be available on ReadTheDocs.
 
-For now, the documentation is available as HTML files in the `pdbcraft/doc/build` directory.
+For now, the documentation is available as HTML files in the `pdbcraft/doc/build` directory. Navigate to the `index.html` file and open it with your favorite browser to read the documentation.
 
 ## Bug reports
 
