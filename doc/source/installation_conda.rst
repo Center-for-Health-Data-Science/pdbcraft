@@ -37,13 +37,15 @@ You can activate the ``conda`` environment using the ``conda activate`` command.
 Step 4 - Get pdbcraft
 ---------------------
 
-Clone the source code from its GitHub repository within a directory of your choice and enter the local copy of the repository.
+First, move to the directory where you wanto to install pdbcraft.
+
+Then, clone the source code from its GitHub repository within a directory of your choice and enter the local copy of the repository.
 
 .. code-block:: shell
 
     git clone https://github.com/Center-for-Health-Data-Science/pdbcraft.git
 
-If the ``git`` command is unavailable, you can download the repository content as a ZIP file from the pdbcraft GitHub repository web page and unzip it.
+If the ``git`` command is unavailable, you can download the repository content as a ZIP file from the web page of pdbcraft's GitHub repository and unzip it.
 
 Step 5 - Install pdbcraft
 -------------------------

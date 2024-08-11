@@ -15,7 +15,7 @@ Please ensure that you have Python installed before proceeding with the installa
 
 The package has been tested only on Unix-based systems.
 
-We provide installation instructions that assumes Python 3.11 is installed, but the same steps remain valid for later versions.
+We provide installation instructions that assume Python 3.11 is installed, but the same steps remain valid for later versions.
 
 Here, we provide instructions for installing pdbcraft in:
 

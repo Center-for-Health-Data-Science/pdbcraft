@@ -74,7 +74,7 @@ class FASTAWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure whose sequence(s) will be extracted.
 
         file : ``str``

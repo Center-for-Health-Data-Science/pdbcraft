@@ -316,7 +316,7 @@ class Structure:
 
         Parameters
         ----------
-        other: ``pdbcraft.structure.Structure``
+        other: :class:`pdbcraft.structure.Structure`
             Another structure.
         """
 
@@ -343,7 +343,7 @@ class Structure:
 
         Parameters
         ----------
-        other: ``pdbcraft.structure.Structure``
+        other: :class:`pdbcraft.structure.Structure`
             Another structure.
         """
 
@@ -403,6 +403,120 @@ class Structure:
 
 
     ###################################################################
+
+
+    def _check_items(self,
+                     model = None,
+                     chain = None,
+                     segment = None,
+                     residue = None):
+        """Check the items passed when using the following methods:
+
+        * :meth:`pdbcraft.structure.Structure.chains`
+        * :meth:`pdbcraft.structure.Structure.segments`
+        * :meth:`pdbcraft.structure.Structure.residues`
+        * :meth:`pdbcraft.structure.Structure.atoms`
+
+        Parameters
+        ----------
+        model : ``int``, optional
+            The model.
+
+        chain : ``str``, optional
+            The chain.
+
+        segment : ``str``, optional
+            The segment.
+
+        residue : ``tuple``, optional
+            The residue.
+        """
+
+        # If a model was passed
+        if model is not None:
+
+            # If the model is not an integer
+            if not isinstance(model, int):
+
+                # Raise an error.
+                errstr = "'model' must be an integer."
+                raise ValueError(errstr)
+
+        #-------------------------------------------------------------#
+
+        # If a chain was passed
+        if chain is not None:
+
+            # If the chain is not a string
+            if not isinstance(chain, str):
+
+                # Raise an error.
+                errstr = "'chain' must be a string."
+                raise ValueError(errstr)
+
+        #-------------------------------------------------------------#
+
+        # If a segment was passed
+        if segment is not None:
+
+            # If the segment is not a string
+            if not isinstance(segment, str):
+
+                # Raise an error.
+                errstr = "'segment' must be a string."
+                raise ValueError(errstr)
+
+        #-------------------------------------------------------------#
+
+        # If a residue was passed
+        if residue is not None:
+
+            # If the residue is not a tuple
+            if not isinstance(residue, tuple):
+
+                # Raise an error.
+                errstr = "'residue' must be a tuple."
+                raise ValueError(errstr)
+
+            # If the tuple is not three elements long
+            if len(residue) != 3:
+
+                # Raise an error.
+                errstr = \
+                    "The 'residue' tuple must contain three " \
+                    "elements: the residue's sequence number " \
+                    "(int), the residue's insertion code (str), " \
+                    "and the residue's name (str)."
+                raise ValueError(errstr)
+
+            # If the tuple's first element is not an integer
+            if not isinstance(residue[0], int):
+
+                # Raise an error.
+                errstr = \
+                    "The first element of the 'residue' tuple " \
+                    "must be an integer (the residue's sequence " \
+                    "number)."
+                raise ValueError(errstr)
+
+            # If the tuple's second element is not an integer
+            if not isinstance(residue[1], str):
+
+                # Raise an error.
+                errstr = \
+                    "The second element of the 'residue' tuple " \
+                    "must be a string (the residue's insertion " \
+                    "code)."
+                raise ValueError(errstr)
+
+            # If the tuple's third element is not an integer
+            if not isinstance(residue[2], str):
+
+                # Raise an error.
+                errstr = \
+                    "The third element of the 'residue' tuple " \
+                    "must be a string (the residue's name)."
+                raise ValueError(errstr)
 
 
     def _should_recurse(self,
@@ -2038,12 +2152,12 @@ class Structure:
 
         Parameters
         ----------
-        other : ``pdbcraft.structure.Structure``
+        other : :class:`pdbcraft.structure.Structure`
             The structure to be merged with the current one.
 
         Returns
         -------
-        merged : ``pdbcraft.structure.Structure``
+        merged : :class:`pdbcraft.structure.Structure`
             The merged structure.
         """
 
@@ -3590,6 +3704,9 @@ class Structure:
         residues : Get all residues in a segment.
         atoms : Get all atoms in a residue.
         """
+
+        # Check the model.
+        self._check_items(model = model)
         
         # Return the chains.
         return (item for item \
@@ -3643,6 +3760,10 @@ class Structure:
         residues : Get all residues in a segment.
         atoms : Get all atoms in a residue.
         """
+
+        # Check the model and the chain.
+        self._check_items(model = model,
+                          chain = chain)
 
         # Return the segments.
         return (item for item \
@@ -3706,6 +3827,11 @@ class Structure:
         segments : Get all segments in a chain.
         atoms : Get all atoms in a residue.
         """
+
+        # Check the model, the chain, and the segment.
+        self._check_items(model = model,
+                          chain = chain,
+                          segment = segment)
 
         # Return the residues.
         return (item for item \
@@ -3775,6 +3901,12 @@ class Structure:
         segments : Get all segments in a chain.
         residues : Get all residues in a segment.
         """
+
+        # Check the model, the chain, the segment, and the residue.
+        self._check_items(model = model,
+                          chain = chain,
+                          segment = segment,
+                          residue = residue)
 
         # Return the atoms.
         return (item for item \
@@ -3856,7 +3988,7 @@ class Structure:
 
         Returns
         -------
-        ``struct_copy`` : ``pdbcraft.structure.Structure``
+        ``struct_copy`` : :class:`pdbcraft.structure.Structure`
             A copy of the current structure.
 
         Examples
@@ -3903,12 +4035,12 @@ class Structure:
 
         Parameters
         ----------
-        other : ``pdbcraft.structure.Structure``
+        other : :class:`pdbcraft.structure.Structure`
             The other structure.
 
         Returns
         -------
-        merged : ``pdbcraft.structure.Structure``
+        merged : :class:`pdbcraft.structure.Structure`
             The merged structure.
 
         Examples
@@ -3999,7 +4131,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -4117,7 +4249,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -4766,7 +4898,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -5004,7 +5136,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -5254,7 +5386,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -5453,7 +5585,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -5685,7 +5817,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples
@@ -5819,7 +5951,7 @@ class Structure:
 
         Returns
         -------
-        ``pdbcraft.structure.Structure`` if ``in_place`` is ``False``;
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
         otherwise, ``None``.
 
         Examples

@@ -23,9 +23,8 @@ Welcome to pdbcraft!
       New to pdbcraft?
 
       Check out our Introduction. Here, you can find a
-      description of pdbcraft's capabilities, how to
-      cite us if you use pdbcraft in your work, and
-      and how to contribute to the package.
+      description of pdbcraft's capabilities and how to
+      cite us if you use pdbcraft in your work.
 
       +++
 
@@ -45,8 +44,7 @@ Welcome to pdbcraft!
 
       Installing pdbcraft.
 
-      Here, you can find the instructions for installing pdbcraft
-      in a Python virtual environment.
+      Here, you can find the instructions for installing pdbcraft.
 
       +++
 
@@ -67,7 +65,7 @@ Welcome to pdbcraft!
       API reference guide.
 
       This guide contains a description of the modules,
-      and objects, and functions included in pdbcraft.
+      classes, and functions included in pdbcraft.
 
       +++
 

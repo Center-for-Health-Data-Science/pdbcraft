@@ -25,7 +25,7 @@ Create your virtual environment in a directory of your choice (in this case, it 
 
     virtualenv -p /usr/bin/python3.11 pdbcraft-env
 
-You should replace the value of option ``-p`` according to the location of the Python interpreter you want to use inside the virtual environment.
+You should replace the value of option ``-p`` with to the location of the Python interpreter you want to use inside the virtual environment.
 
 Remember that pdbcraft needs Python 3.11 or higher.
 
@@ -41,13 +41,15 @@ Activate the environment:
 Step 4 - Get pdbcraft
 ---------------------
 
+First, move to the directory where you wanto to install pdbcraft. Do not install it inside the ``pdbcraft-env`` directory. 
+
 Clone the source code from its GitHub repository within a directory of your choice and enter the local copy of the repository.
 
 .. code-block:: shell
 
     git clone https://github.com/Center-for-Health-Data-Science/pdbcraft.git
 
-If the ``git`` command is unavailable, you can download the repository content as a ZIP file from the pdbcraft GitHub repository web page and unzip it.
+If the ``git`` command is unavailable, you can download the repository content as a ZIP file from the web page of pdbcraft's GitHub repository and unzip it.
 
 Step 5 - Install pdbcraft
 -------------------------

@@ -27,4 +27,4 @@ pdbcraft consists of several modules:
 
 * :doc:`fastawriters <fastawriters>`, containing writers for FASTA files.
 
-* :doc:`util <util>`, containing general utility functions.
+* :doc:`util <util>`, containing miscellanea utility functions.

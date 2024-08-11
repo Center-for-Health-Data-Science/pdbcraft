@@ -42,7 +42,9 @@ import urllib.request
 from . import (
     _defaults,
     mmcifparsers,
+    mmcifwriters,
     pdbparsers,
+    pdbwriters,
     structure,
     )
 
@@ -58,16 +60,10 @@ logger = log.getLogger(__name__)
 
 
 # Set a dictionary mapping the parsers' names to the classes they
-# represent.
+# represent and the options to be used with their 'parse()' method.
 NAME2PARSER = \
-    {"PDBParser" : pdbparsers.PDBParser,
-     "MMCIFParser" : mmcifparsers.MMCIFParser}
-
-# Set a dictionary mapping the file types to the default parser that
-# will be used for them and the parser's options.
-FILETYPE2PARSER = \
-    {"pdb" : \
-        {"name" : "PDBParser",
+    {"PDBParser" : \
+        {"class" : pdbparsers.PDBParser,
          "options" : \
             {"only_alt_loc" : "A",
              "parse_conect_records" : True,
@@ -75,8 +71,8 @@ FILETYPE2PARSER = \
              "parse_link_records" : True,
              "is_extended_pdb" : False,
              "fix_residues_overflow" : True}},
-     "mmcif" : \
-        {"name" : "MMCIFParser",
+     "MMCIFParser" : \
+        {"class" : mmcifparsers.MMCIFParser,
          "options" : \
             {"only_alt_loc" : "A",
              "use_auth_chain_ids" : True,
@@ -84,6 +80,44 @@ FILETYPE2PARSER = \
              "use_auth_res_names" : True,
              "use_auth_atom_names" : True,
              "strict" : False}}}
+
+# Set a dictionary mapping the file types to the default parser that
+# will be used for them and the parser's options.
+FILETYPE2PARSER = \
+    {"pdb" : \
+        {"name" : "PDBParser",
+         "options" : NAME2PARSER["PDBParser"]["options"]},
+     "mmcif" : \
+        {"name" : "MMCIFParser",
+         "options" : NAME2PARSER["MMCIFParser"]["options"]}}
+
+#---------------------------------------------------------------------#
+
+# Set a dictionary mapping the writers' names to the classes they
+# represent and the options to be used with their 'write()' method.
+NAME2WRITER = \
+    {"PDBWriter" : \
+        {"class" : pdbwriters.PDBWriter,
+         "options" : \
+            {"write_conect_records" : True,
+             "write_ssbond_records" : True,
+             "write_models_records" : True}},
+     "MMCIFWriter" : \
+        {"class" : mmcifwriters.MMCIFWriter,
+         "options" : \
+            {"write_conect_data" : True}}}
+
+# Set a dictionary mapping the file types to the default writer that
+# will be used for them and the writer's options.
+FILETYPE2WRITER = \
+    {"pdb" : \
+        {"name" : "PDBWriter",
+         "options" : NAME2WRITER["PDBWriter"]["options"]},
+     "mmcif" : \
+        {"name" : "MMCIFWriter",
+         "options" : NAME2WRITER["MMCIFWriter"]["options"]}}
+
+#---------------------------------------------------------------------#
 
 # Set the mapping between the source and where to retrieve the
 # the structures from.
@@ -136,9 +170,10 @@ def load_structure(struct_file,
         By default:
 
         - If the file is a PDB file, the
-          ``pdbcraft.pdbparsers.PDBParser`` parser will be used.
+          :class:`pdbcraft.pdbparsers.PDBParser` parser will be used.
         - If the file is a mmCIF file, the
-          ``pdbcraft.mmcifparsers.MMCIFParser`` parser will be used.
+          :class:`pdbcraft.mmcifparsers.MMCIFParser` parser will be
+          used.
 
     parser_options : ``dict``, optional
         The options to be passed to the ``parse()`` method
@@ -148,7 +183,7 @@ def load_structure(struct_file,
 
     Returns
     -------
-    struct : ``pdbcraft.structure.Structure``
+    struct : :class:`pdbcraft.structure.Structure`
         The structure.
     """
 
@@ -176,8 +211,8 @@ def load_structure(struct_file,
         # If no options for the parser were provided
         if parser_options is None:
 
-            # Set it to an empty dictionary.
-            parser_options = {}
+            # Set it to the default options.
+            parser_options = NAME2PARSER[parser_name]["options"]
 
     # Otherwise
     else:
@@ -195,7 +230,21 @@ def load_structure(struct_file,
     #-----------------------------------------------------------------#
 
     # Create the parser.
-    parser = NAME2PARSER[parser_name]()
+    parser = NAME2PARSER[parser_name]["class"]()
+
+    # Create a string contaning the parser's options.
+    parser_options_str = \
+        ", ".join(\
+            [f"{opt} = '{val}'" if isinstance(val, str) \
+             else f"{opt} = {val}" \
+             for opt, val in parser_options.items()])
+
+    # Inform the user about the parser that will be used and the
+    # options for the 'parse()' method.
+    infostr = \
+        f"Reading the structure using the '{parser_name}' parser. " \
+        f"Options used for the 'parse()' method: {parser_options_str}."
+    logger.info(infostr)
 
     # Read in the structure.
     struct = parser.parse(file = struct_file,
@@ -211,12 +260,13 @@ def fetch_structure(struct_id,
                     source = "pdb",
                     file_type = "mmcif",
                     save_file = False,
-                    file_name = None,
+                    file = None,
                     parser_name = None,
                     parser_options = None):
     """Given the ID of a structure in either the Protein Data Bank
     or the AlphaFold Protein Structure Database, return a
-    ``pdbcraft.structure.Structure`` instance containing the structure.
+    :class:`pdbcraft.structure.Structure` instance containing the
+    structure.
 
     Parameters
     ----------
@@ -233,14 +283,14 @@ def fetch_structure(struct_id,
         AlphaFold Protein Structure Database.
 
     file_type : ``str``, {``"pdb"``, ``"mmcif"``}, ``"mmcif"``
-        Whether to generate the ``pdbcraft.structure.Structure``
+        Whether to generate the :class:`pdbcraft.structure.Structure`
         instance from the structure's PDB (``"pdb"``) or PCBx/MMCIF
         (``"mmcif"``) file.
 
     save_file : ``bool``, ``"False"``
         Whether to save the file the structure was created from.
 
-    file_name : ``str``, optional
+    file : ``str``, optional
         The file where to save the structure, if ``save_file`` is
         ``True``.
 
@@ -256,9 +306,10 @@ def fetch_structure(struct_id,
         By default:
         
         - If ``file_type`` is ``"pdb"``, the
-          ``pdbcraft.pdbparsers.PDBParser`` parser will be used.
+          :class:`pdbcraft.pdbparsers.PDBParser` parser will be used.
         - If ``file_type`` is ``"mmcif"``, the
-          ``pdbcraft.mmcifparsers.MMCIFParser`` parser will be used.
+          :class:`pdbcraft.mmcifparsers.MMCIFParser` parser will be
+          used.
 
     parser_options : ``dict``, optional
         The options to be passed to the ``parse()`` method
@@ -268,7 +319,7 @@ def fetch_structure(struct_id,
 
     Returns
     -------
-    struct : ``pdbcraft.structure.Structure``
+    struct : :class:`pdbcraft.structure.Structure`
         The structure.
     """
 
@@ -321,8 +372,8 @@ def fetch_structure(struct_id,
         # If no options for the parser were provided
         if parser_options is None:
 
-            # Set it to an empty dictionary.
-            parser_options = {}
+            # Set it to the default options.
+            parser_options = NAME2PARSER[parser_name]["options"]
 
     # Otherwise
     else:
@@ -371,17 +422,17 @@ def fetch_structure(struct_id,
     # If we need to save the file
     if save_file:
 
-        # If the user did not provide a custom file name
-        if file_name is None:
+        # If the user did not provide a custom file path
+        if file is None:
 
             # Set it.
-            file_name = \
+            file = \
                 os.path.join(\
                     os.getcwd(),
                     f"{struct_id}{FILETYPE2FILEEXT[file_type]}")
 
         # Open the file.
-        f = open(file_name, "r")
+        f = open(file, "r")
 
         # Write out the data.
         f.write(data)
@@ -389,7 +440,7 @@ def fetch_structure(struct_id,
         # Inform the user that the file was saved.
         infostr = \
             f"The structure with ID '{struct_id}' was successfully " \
-            f"saved in '{file_name}'."
+            f"saved in '{file}'."
         logger.info(infostr)
 
     # Otherwise
@@ -402,15 +453,29 @@ def fetch_structure(struct_id,
         f.write(data)
 
         # Set the file's name to the name of the temporary file.
-        file_name = f.name
+        file = f.name
 
     #-----------------------------------------------------------------#
 
     # Create the parser.
-    parser = NAME2PARSER[parser_name]()
+    parser = NAME2PARSER[parser_name]["class"]()
+
+    # Create a string contaning the parser's options.
+    parser_options_str = \
+        ", ".join(\
+            [f"{opt} = '{val}'" if isinstance(val, str) \
+             else f"{opt} = {val}" \
+             for opt, val in parser_options.items()])
+
+    # Inform the user about the parser that will be used and the
+    # options for the 'parse()' method.
+    infostr = \
+        f"Reading the structure using the '{parser_name}' parser. " \
+        f"Options used for the 'parse()' method: {parser_options_str}."
+    logger.info(infostr)
 
     # Read in the structure.
-    struct = parser.parse(file = file_name,
+    struct = parser.parse(file = file,
                           **parser_options)
 
     #-----------------------------------------------------------------#
@@ -424,14 +489,113 @@ def fetch_structure(struct_id,
     return struct
 
 
+def write_structure(struct,
+                    file,
+                    writer_name = None,
+                    writer_options = None):
+    """Write a structure as a PDB or PDBx/mmCIF file.
+
+    Parameters
+    ----------
+    struct : :class:`pdbcraft.structure.Structure`
+        The structure.
+
+    file : ``str``
+        The file where to write the structure. The file's type will
+        be guessed from the file's extension.
+
+    writer_name : ``str``, optional, \
+        {``"PDBWriter"``, ``"MMCIFWriter"``}
+        The name of the writer to be used to write the structure.
+
+        By default:
+
+        - If the file is a PDB file, the
+          :class:`pdbcraft.pdbwriters.PDBWriter` writer will be used.
+        - If the file is a mmCIF file, the
+          :class:`pdbcraft.mmcifwriters.MMCIFWriter` writer will be
+          used.
+
+    writer_options : ``dict``, optional
+        The options to be passed to the ``write()`` method
+        of the PDB or PDBx/MMCIF writer defined by ``writer_name``.
+
+        This option is ignored if no ``writer_name`` is passed.
+    """
+
+    # Get the file's extension.
+    file_name, file_ext = os.path.splitext(file)
+
+    #-----------------------------------------------------------------#
+
+    # If the user passed the name of a writer
+    if writer_name is not None:
+
+        # If the name of the writer is invalid
+        if writer_name not in NAME2WRITER:
+
+            # Set a string representing the valid names.
+            valid_names_str = \
+                ", ".join((f"'{n}'" for n in NAME2WRITER))
+
+            # Raise an error
+            errstr = \
+                f"Invalid 'writer_name': '{writer_name}'. Valid " \
+                f"writer names are: {valid_names_str}."
+            raise ValueError(errstr)
+
+        # If no options for the writer were provided
+        if writer_options is None:
+
+            # Set it to the default options.
+            writer_options = NAME2WRITER[writer_name]["options"]
+
+    # Otherwise
+    else:
+
+        # Fall back to the default writer for this specific type of
+        # file.
+        writer_name = \
+            FILETYPE2WRITER[FILEEXT2FILETYPE[file_ext]]["name"]
+
+        # Fall back to the default writer's options for this specific
+        # type of file.
+        writer_options = \
+            FILETYPE2WRITER[FILEEXT2FILETYPE[file_ext]]["options"]
+
+    #-----------------------------------------------------------------#
+
+    # Create the writer.
+    writer = NAME2WRITER[writer_name]["class"]()
+
+    # Create a string contaning the writer's options.
+    writer_options_str = \
+        ", ".join(\
+            [f"{opt} = '{val}'" if isinstance(val, str) \
+             else f"{opt} = {val}" \
+             for opt, val in writer_options.items()])
+
+    # Inform the user about the writer that will be used and the
+    # options for the 'write()' method.
+    infostr = \
+        f"Writing the structure using the '{writer_name}' writer. " \
+        f"Options used for the 'write()' method: {writer_options_str}."
+    logger.info(infostr)
+
+    # Write the structure.
+    writer.write(struct = struct,
+                 file = file,
+                 **writer_options)
+
+
 def list_examples():
     """List all structures available as examples.
 
     Returns
     -------
     examples : ``list``
-        A list containing the IDs of the structures available as
-        examples.
+        A list containing the names of the files of the structures
+        available as examples.
     """
     
     # Return the names of the files in the directory containing the
@@ -445,14 +609,14 @@ def load_example(example_id):
     Parameters
     ----------
     example_id : ``str``
-        The ID of the example structures.
+        The name of the file of a structure available as an example.
 
         You can see all available structures by calling the
-        ``list_examples()`` function.
+        :func:`pdbcraft.util.list_examples` function.
 
     Returns
     -------
-    struct : ``pdbcraft.structure.Structure``
+    struct : :class:`pdbcraft.structure.Structure`
         The structure.
     """
 

@@ -43,7 +43,7 @@ import os
 import re
 # Import from 'pdbcraft'.
 from .structure import Structure
-from . import _defaults
+from . import _defaults, _util
 
 
 #######################################################################
@@ -288,7 +288,7 @@ class PDBParser:
                     #-------------------------------------------------#
 
                     # Get the atom's residue name.
-                    res_name = line[17:20]
+                    res_name = line[17:20].strip()
 
                     #-------------------------------------------------#
 
@@ -665,6 +665,14 @@ class PDBParser:
 
         #-------------------------------------------------------------#
 
+        # Sort the atomic coordinates.
+        atom_data = \
+            _util.sort_keys_at_depths(\
+                d = atom_data,
+                depths = list(Structure._IDS_DEPTH_TO_LEVELS.keys()))
+
+        #-------------------------------------------------------------#
+
         # Return the parsed data.
         return atom_data, serials2ids, oldids2newids
 
@@ -1001,7 +1009,7 @@ class PDBParser:
 
             # Log the fact that we are getting the LINK data.
             debugstr = \
-                "Now getting the 'link' bonds' data from the LINK " \
+                "Now getting the LINK bonds' data from the LINK " \
                 "records..."
             logger.debug(debugstr)
 
@@ -1470,7 +1478,7 @@ class PDBParser:
 
         Returns
         -------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The parsed structure.
         """
 
@@ -1518,7 +1526,7 @@ class PDBParser:
 
         #-------------------------------------------------------------#
 
-        # Get all connectivity data.
+        # Get all the connectivity data.
         all_conect = \
             self._get_all_conect(conect_data = conect_data,
                                  ssbond_data = ssbond_data,

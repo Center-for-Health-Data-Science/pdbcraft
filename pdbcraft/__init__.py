@@ -34,6 +34,7 @@ from .pdbparsers import *
 from .structure import *
 
 # Import everything from the writers' modules.
+from .fastawriters import *
 from .mmcifwriters import *
 from .pdbwriters import *
 

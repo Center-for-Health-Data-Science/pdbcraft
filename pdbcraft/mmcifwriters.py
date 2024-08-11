@@ -77,8 +77,8 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
-            The structure to be written out.
+        struct : :class:`pdbcraft.structure.Structure`
+            The structure to be written.
 
         Returns
         -------
@@ -280,8 +280,8 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
-            The structure to be written out.
+        struct : :class:`pdbcraft.structure.Structure`
+            The structure to be written.
 
         Returns
         -------
@@ -548,8 +548,8 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
-            The structure to be written out.
+        struct : :class:`pdbcraft.structure.Structure`
+            The structure to be written.
 
         Returns
         -------
@@ -726,7 +726,7 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -779,7 +779,7 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -942,7 +942,7 @@ class MMCIFWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -1143,15 +1143,15 @@ class MMCIFWriter:
               struct,
               file,
               write_conect_data = True):
-        """Write a ``Structure`` in a mmCIF file.
+        """Write a structure as a mmCIF file.
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
-            The structure to be written.
+        struct : :class:`pdbcraft.structure.Structure`
+            The structure.
 
         file : ``str``
-            The file where the structure will be written.
+            The file where to write the structure.
 
         write_conect_data : ``bool``, ``True``
             Write the connectivity data associated with the
@@ -1166,7 +1166,7 @@ class MMCIFWriter:
             fmt_strings = \
                 self._get_format_strings(struct = struct)
 
-            #-----------------------------------------------------#
+            #---------------------------------------------------------#
 
             # Write out the 'data_' directive and the structure's
             # name.
@@ -1176,14 +1176,14 @@ class MMCIFWriter:
             # Write out a comment line.
             out.write("#\n")
 
-            #-----------------------------------------------------#
+            #---------------------------------------------------------#
 
             # Write out the '_atom_type' category.
             self._write_atom_type(\
                 struct = struct,
                 file_handle = out)
 
-            #-----------------------------------------------------#
+            #---------------------------------------------------------#
 
             # Write out the '_atom_site' category.
             self._write_atom_site(\
@@ -1191,7 +1191,7 @@ class MMCIFWriter:
                 file_handle = out,
                 fmt_strings = fmt_strings["_atom_site"])
 
-            #-----------------------------------------------------#
+            #---------------------------------------------------------#
 
             # If we need to write out connectivity data
             if write_conect_data:
@@ -1201,3 +1201,9 @@ class MMCIFWriter:
                     struct = struct,
                     file_handle = out,
                     fmt_strings = fmt_strings["_struct_conn"])
+
+            #---------------------------------------------------------#
+            
+            # Inform the user that the structure was written.
+            infostr = f"The structure was saved in '{file}'."
+            logger.info(infostr)

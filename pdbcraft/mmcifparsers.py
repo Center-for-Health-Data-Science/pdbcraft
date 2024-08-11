@@ -1971,7 +1971,7 @@ class MMCIFParser:
 
         Returns
         -------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The parsed structure.
         """
 

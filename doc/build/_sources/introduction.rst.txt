@@ -1,7 +1,7 @@
 Getting started
 ===============
 
-pdbcraft is a lightweight Python package to manipulate the molecular structures stored in PDB files (with support for MMCIF files coming soon).
+pdbcraft is a lightweight Python package to manipulate the molecular structures stored in PDB and PDBx/mmCIF files.
 
 Installation
 ------------

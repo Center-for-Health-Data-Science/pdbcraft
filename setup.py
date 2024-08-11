@@ -27,6 +27,9 @@
 from setuptools import setup
 
 
+#######################################################################
+
+
 # Set the name of the project.
 name = "pdbcraft"
 
@@ -39,7 +42,7 @@ url = \
 author = "Valentina Sora"
 
 # Set the project's version.
-version = "0.0.1"
+version = "1.0.0-alpha1"
 
 # Set a brief description of the project.
 description = \
@@ -48,6 +51,10 @@ description = \
 
 # Set which packages are included.
 packages = ["pdbcraft"]
+
+
+#######################################################################
+
 
 # Run the setup.
 setup(name = name,

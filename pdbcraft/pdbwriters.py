@@ -70,7 +70,7 @@ class PDBWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -223,7 +223,7 @@ class PDBWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -342,7 +342,7 @@ class PDBWriter:
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
+        struct : :class:`pdbcraft.structure.Structure`
             The structure to be written.
 
         file_handle : file handle
@@ -464,12 +464,12 @@ class PDBWriter:
               write_conect_records = True,
               write_ssbond_records = True,
               write_models_records = True):
-        """Write a structure to a PDB file.
+        """Write a structure as a PDB file.
 
         Parameters
         ----------
-        struct : ``pdbcraft.structure.Structure``
-            The structure to be written.
+        struct : :class:`pdbcraft.structure.Structure`
+            The structure.
 
         file : ``str``
             The file where to write the structure.
@@ -523,3 +523,9 @@ class PDBWriter:
 
             # Write out the end of the PDB file.
             out.write("END   \n")
+
+            #---------------------------------------------------------#
+            
+            # Inform the user that the structure was written.
+            infostr = f"The structure was saved in '{file}'."
+            logger.info(infostr)
