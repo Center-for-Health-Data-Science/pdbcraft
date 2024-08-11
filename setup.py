@@ -42,7 +42,7 @@ url = \
 author = "Valentina Sora"
 
 # Set the project's version.
-version = "1.0.0-alpha1"
+version = "1.0.0-alpha"
 
 # Set a brief description of the project.
 description = \
