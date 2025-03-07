@@ -1,0 +1,7 @@
+myst-parser
+sphinx
+numpydoc
+sphinx_design
+sphinxcontrib-bibtex
+sphinx_rtd_theme
+pydata_sphinx_theme

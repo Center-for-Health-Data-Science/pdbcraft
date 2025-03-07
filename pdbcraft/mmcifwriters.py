@@ -5,7 +5,7 @@
 #
 #    Writers for mmCIF files.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -82,7 +82,7 @@ class MMCIFWriter:
 
         Returns
         -------
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary mapping the names of the data items in the
             '_atom_site' category to the format strings used for the
             corresponding fields in the output mmCIF file.
@@ -285,7 +285,7 @@ class MMCIFWriter:
 
         Returns
         -------
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary mapping the names of the data items in the
             '_struct_conn' category to the format strings used for the
             corresponding fields in the output mmCIF file.
@@ -553,7 +553,7 @@ class MMCIFWriter:
 
         Returns
         -------
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary of dictionaries mapping the name of each
             data category to a dictionary mapping the names of the
             data items in that category to the format strings used
@@ -570,7 +570,7 @@ class MMCIFWriter:
 
         #-------------------------------------------------------------#
 
-        # Merge them into a sigle dictionary for easier access.
+        # Merge them into a single dictionary for easier access.
         item2width = \
             {"_atom_site" : i2w_atom,
              "_struct_conn" : i2w_con}
@@ -592,7 +592,7 @@ class MMCIFWriter:
         # items' widths
         for category, i2w in item2width.items():
 
-            # Get the informaton about each item (such as the value's
+            # Get the information about each item (such as the value's
             # data type and, if it is a floating point number, how many
             # decimal digits should be written out, etc.).
             items_info = _defaults.MMCIF_CATEGORIES[category]
@@ -660,10 +660,10 @@ class MMCIFWriter:
         file_handle : file handle
             The file handle.
 
-        items : ``dict``
+        items : :class:`dict`
             A dictionary mapping the data items to their values.
 
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary of dictionaries mapping the name of each
             data category to a dictionary mapping the names of the
             data items in that category to the format strings used
@@ -785,7 +785,7 @@ class MMCIFWriter:
         file_handle : file handle
             The file handle.
 
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary mapping the names of the data items in the
             '_atom_site' category to the format strings used for the
             items' values in the output mmCIF file.
@@ -948,7 +948,7 @@ class MMCIFWriter:
         file_handle : file handle
             The file handle.
 
-        fmt_strings : ``dict``
+        fmt_strings : :class:`dict`
             A dictionary mapping the names of the data items in the
             '_struct_conn' category to the format strings used for the
             items' values in the output mmCIF file.
@@ -1150,10 +1150,10 @@ class MMCIFWriter:
         struct : :class:`pdbcraft.structure.Structure`
             The structure.
 
-        file : ``str``
+        file : :class:`str`
             The file where to write the structure.
 
-        write_conect_data : ``bool``, ``True``
+        write_conect_data : :class:`bool`, ``True``
             Write the connectivity data associated with the
             structure, if any are present.
         """

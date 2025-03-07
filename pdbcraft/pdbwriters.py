@@ -5,7 +5,7 @@
 #
 #    Writers for PDB files.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -76,7 +76,7 @@ class PDBWriter:
         file_handle : file handle
             The handle of the file where to write the structure.
 
-        write_models_records : ``bool``
+        write_models_records : :class:`bool`
             Write the MODEL and ENDMDL records for each model found
             in the structure.
 
@@ -382,7 +382,7 @@ class PDBWriter:
                 in struct.conect_data[mod].items():
 
                 # Get:
-                # - The dentifier of the chain the first atom belongs
+                # - The identifier of the chain the first atom belongs
                 #   to.
                 # - The sequence number of the residue the first atom
                 #   belongs to.
@@ -406,7 +406,7 @@ class PDBWriter:
                         continue
 
                     # Get:
-                    # - The dentifier of the chain the second atom
+                    # - The identifier of the chain the second atom
                     #   belongs to.
                     # - The sequence number of the residue the second
                     #   atom belongs to.
@@ -471,18 +471,18 @@ class PDBWriter:
         struct : :class:`pdbcraft.structure.Structure`
             The structure.
 
-        file : ``str``
+        file : :class:`str`
             The file where to write the structure.
 
-        write_conect_records : ``bool``, ``True``
+        write_conect_records : :class:`bool`, ``True``
             Write the CONECT data from the connectivity data
             associated with the structure, if any are present.
 
-        write_ssbond_records : ``bool``, ``True``
+        write_ssbond_records : :class:`bool`, ``True``
             Write the SSBOND data from the connectivity data
             associated with the structure, if any are present.
 
-        write_models_records : ``bool``, ``True``
+        write_models_records : :class:`bool`, ``True``
             Write the MODEL and ENDMDL records for each model found
             in the structure.
 

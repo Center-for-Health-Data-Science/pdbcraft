@@ -5,7 +5,7 @@
 #
 #    Parsers for mmCIF files.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -94,12 +94,12 @@ class MMCIFParser:
 
         Parameters
         ----------
-        token : ``str``
+        token : :class:`str`
             The token as a string.
 
         Returns
         -------
-        token : ``str``, ``int``, ``float``
+        token : :class:`str`, :class:`int`, :class:`float`
             The token as a string, integer, or floating-point
             number.
         """
@@ -158,12 +158,12 @@ class MMCIFParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The mmCIF file to be parsed.
 
         Yields
         ------
-        ``str``
+        token : :class:`str`
             A string representing a token.
         """
 
@@ -311,12 +311,12 @@ class MMCIFParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The mmCIF file.
 
         Returns
         -------
-        data : ``dict``
+        data : :class:`dict`
             The dictionary containing information parsed from the file.
         """
 
@@ -334,7 +334,7 @@ class MMCIFParser:
 
         #-------------------------------------------------------------#
 
-        # Set a flag for whehter we are entering a 'loop_' section,
+        # Set a flag for whether we are entering a 'loop_' section,
         # and initialize it to False.
         is_loop = False
 
@@ -390,7 +390,7 @@ class MMCIFParser:
                 # is a data item. The conditions that must be met are:
                 # - The token starts with an underscore.
                 # - AND we are at the start of the portion of the 
-                #       'loop_' section containig data items
+                #       'loop_' section containing data items
                 #       OR the current line of the 'loop_' section is
                 #         a line containing data items.
                 is_data_item = \
@@ -533,14 +533,14 @@ class MMCIFParser:
 
         Parameters
         ----------
-        data : ``dict``
+        data : :class:`dict`
             A dictionary containing the data parsed from the mmCIF
             file.
 
-        category_name : ``str``
+        category_name : :class:`str`
             The name of the data category to be checked.
 
-        strict : ``bool``
+        strict : :class:`bool`
             Whether we are running in 'strict' mode or not.
             
             Running in 'strict' mode means that any violation of the
@@ -852,7 +852,7 @@ class MMCIFParser:
 
                 # Evaluate whether any of the values falls outside
                 # of the boundaries.
-                is_any_outide = \
+                is_any_outside = \
                     any((isinstance(val, str) \
                             and val != "") or \
                         (not isinstance(val, str) \
@@ -860,7 +860,7 @@ class MMCIFParser:
                         for val in item_vals)
 
                 # If there are values outside of the boundaries
-                if is_any_outide:
+                if is_any_outside:
 
                     # Set the warning/error string.
                     errstr = \
@@ -911,30 +911,30 @@ class MMCIFParser:
 
         Parameters
         ----------
-        data : ``dict``
+        data : :class:`dict`
             A dictionary containing the data parsed from the file.
 
-        use_auth_chain_ids : ``bool``
+        use_auth_chain_ids : :class:`bool`
             Use the authors-defined chain IDs instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_seqs : ``bool``
+        use_auth_res_seqs : :class:`bool`
             Use the authors-defined residue numbers instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_names : ``bool``
+        use_auth_res_names : :class:`bool`
             Use the authors-defined residue names instead of the
             automatically assigned ones, if available.
 
-        use_auth_atom_names : ``bool``
+        use_auth_atom_names : :class:`bool`
             Use the authors-defined atom names instead of the
             automatically assigned ones, if available.
 
-        only_alt_loc : ``str``, ``"A"``
+        only_alt_loc : :class:`str`, ``"A"``
             For atoms having multiple alternate locations, keep only
             those with ``only_alt_loc`` alternate location.
 
-        strict : ``bool``
+        strict : :class:`bool`
             Whether to run in strict mode.
 
             Running in strict mode means that:
@@ -963,7 +963,7 @@ class MMCIFParser:
 
         Returns
         -------
-        atom_data : ``dict``
+        atom_data : :class:`dict`
             A dictionary containing the atomic coordinates and
             associated data.
         """
@@ -1474,7 +1474,7 @@ class MMCIFParser:
         #-------------------------------------------------------------#
 
         # Return:
-        # - The dictionary containing the atomic coodinates (and
+        # - The dictionary containing the atomic coordinates (and
         #   associated data).
         # - The dictionary that will be used to correctly assign
         #   connectivity records to the atoms.
@@ -1494,30 +1494,30 @@ class MMCIFParser:
 
         Parameters
         ----------
-        data : ``dict``
+        data : :class:`dict`
             A dictionary containing the data parsed from the file.
 
-        models2ids : ``dict``
+        models2ids : :class:`dict`
             A dictionary mapping unique atoms' identifiers to the
             serial numbers the atoms have in the different models.
 
-        use_auth_chain_ids : ``bool``
+        use_auth_chain_ids : :class:`bool`
             Use the authors-defined chain IDs instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_seqs : ``bool``
+        use_auth_res_seqs : :class:`bool`
             Use the authors-defined residue numbers instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_names : ``bool``
+        use_auth_res_names : :class:`bool`
             Use the authors-defined residue names instead of the
             automatically assigned ones, if available.
 
-        use_auth_atom_names : ``bool``
+        use_auth_atom_names : :class:`bool`
             Use the authors-defined atom names instead of the
             automatically assigned ones, if available.
 
-        strict : ``bool``
+        strict : :class:`bool`
             Whether to run in strict mode, meaning that:
 
             - An error will be raised if any of the categories or
@@ -1545,7 +1545,7 @@ class MMCIFParser:
 
         Returns
         -------
-        conect_data : ``dict``
+        conect_data : :class:`dict`
             A dictionary containing the connectivity data.
         """
 
@@ -1920,30 +1920,30 @@ class MMCIFParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The mmCIF file to be parsed.
 
-        only_alt_loc : ``str``, ``"A"``
+        only_alt_loc : :class:`str`, ``"A"``
             For atoms having multiple alternate locations, keep only
             those with ``only_alt_loc`` alternate location.
 
-        use_auth_chain_ids : ``bool``, ``True``
+        use_auth_chain_ids : :class:`bool`, ``True``
             Use the authors-defined chain IDs instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_seqs : ``bool``, ``True``
+        use_auth_res_seqs : :class:`bool`, ``True``
             Use the authors-defined residue numbers instead of the
             automatically assigned ones, if available.
 
-        use_auth_res_names : ``bool``, ``True``
+        use_auth_res_names : :class:`bool`, ``True``
             Use the authors-defined residue names instead of the
             automatically assigned ones, if available.
 
-        use_auth_atom_names : ``bool``, ``True``
+        use_auth_atom_names : :class:`bool`, ``True``
             Use the authors-defined atom names instead of the
             automatically assigned ones, if available.
 
-        strict : ``bool``, ``False``
+        strict : :class:`bool`, ``False``
             Whether to run in strict mode, meaning that:
 
             - An error will be raised if any of the categories or
@@ -1974,8 +1974,6 @@ class MMCIFParser:
         struct : :class:`pdbcraft.structure.Structure`
             The parsed structure.
         """
-
-        #-------------------------------------------------------------#
 
         # Inform the user that we are parsing the file.
         infostr = f"Now parsing mmCIF file '{file}'..."

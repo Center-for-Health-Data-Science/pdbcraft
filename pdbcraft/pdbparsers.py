@@ -5,7 +5,7 @@
 #
 #    Parsers for PDB files.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -87,20 +87,20 @@ class PDBParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The PDB file to be parsed.
 
-        is_extended_pdb: ``bool``, ``False``
+        is_extended_pdb: :class:`bool`, ``False``
             Whether the PDB file follows the "extended" PDB format,
             where the field usually reserved for a residue's
-            insertion code is used as an additional fied to store
+            insertion code is used as an additional field to store
             the residue's sequence number.
 
-        fix_residues_overflow : ``bool``, ``True``
+        fix_residues_overflow : :class:`bool`, ``True``
             If the PDB file resets the residue numbering mid-chain
             (which can happen when a chain has more than 9999
             residues and the program writing the file could not
-            hande it properly), automatically fix the issue by
+            handle it properly), automatically fix the issue by
             continuing the numbering past 9999.
 
             If ``True``, a warning will be raised and the numbering
@@ -108,20 +108,20 @@ class PDBParser:
 
             If ``False``, an exception will be raised.
 
-        only_alt_loc : ``str``, ``"A"``
+        only_alt_loc : :class:`str`, ``"A"``
             For atoms having multiple alternate locations, keep only
             those with ``only_alt_loc`` alternate location.
 
         Returns
         -------
-        atom_data : ``dict``
+        atom_data : :class:`dict`
             A dictionary containing the atomic coordinates.
 
-        serials2ids : ``dict``
+        serials2ids : :class:`dict`
             A dictionary mapping the atoms' serial numbers to the
             atoms' original identifiers.
 
-        oldids2newids : ``dict``
+        oldids2newids : :class:`dict`
             A dictionary mapping the atoms' old identifiers to the
             ones used in the structure.
         """
@@ -212,7 +212,7 @@ class PDBParser:
                 # Get the record's header.
                 header = line[0:6]
 
-                # Log the current record for debug purporses.
+                # Log the current record for debug purposes.
                 debugstr = \
                     f"Now parsing the '{header}' record on line " \
                     f"{line_ix}..."
@@ -237,7 +237,7 @@ class PDBParser:
                             "sequentially in the PDB file."
                         raise ValueError(errstr)
 
-                    # Log the model's number for debug purporses
+                    # Log the model's number for debug purposes.
                     debugstr = f"Model: {model}."
                     logger.debug(debugstr)
 
@@ -428,7 +428,7 @@ class PDBParser:
                     # If something went wrong
                     except Exception:
 
-                        # Raise an error
+                        # Raise an error.
                         errstr = \
                             "Missing or invalid value found " \
                             f"for the occupancy of atom {serial} " \
@@ -446,7 +446,7 @@ class PDBParser:
                     # If something went wrong
                     except Exception:
 
-                        # Raise an error
+                        # Raise an error.
                         errstr = \
                             "Missing or invalid value found " \
                             f"for the temperature factor (b-factor)" \
@@ -559,8 +559,8 @@ class PDBParser:
                                       "pdbx_formal_charge"  : charge,
                                       "label_entity_id" : ""}}
 
-                    # Log the data about the curren atom for debug
-                    # purporses.
+                    # Log the data about the t atom for debug
+                    # purposes.
                     debugstr = \
                         f"Atom: {serial}. " \
                         f"Atom name: {atom_name}. " \
@@ -620,7 +620,7 @@ class PDBParser:
                         
                         # Add an entry for the model in the dictionary
                         # mapping the atoms' serials to their original
-                        # idenfitiers.
+                        # identifiers.
                         serials2ids[model] = \
                             {serial : atom_id_old}
 
@@ -629,7 +629,7 @@ class PDBParser:
 
                         # Update the model's entry in the dictionary
                         # mapping the atoms' serials to their original
-                        # idenfitiers.
+                        # identifiers.
                         serials2ids[model][serial] = atom_id_old
 
                     #-------------------------------------------------#
@@ -638,7 +638,7 @@ class PDBParser:
                     if model not in oldids2newids:
                         
                         # Add an entry for the model in the dictionary
-                        # mapping the atoms' original idenfitiers to
+                        # mapping the atoms' original identifiers to
                         # the ones used in the structure.
                         oldids2newids[model] = \
                             {atom_id_old : atom_id_new}
@@ -647,7 +647,7 @@ class PDBParser:
                     else:
 
                         # Update the model's entry in the dictionary
-                        # mapping the atoms' original idenfitiers to
+                        # mapping the atoms' original identifiers to
                         # the ones used in the structure.
                         oldids2newids[model][atom_id_old] = \
                             atom_id_new
@@ -684,16 +684,16 @@ class PDBParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The PDB file to be parsed.
 
-        serials2ids : ``dict``
+        serials2ids : :class:`dict`
             A dictionary mapping the atoms' serial numbers to
             the atoms' original identifiers.
         
         Returns
         -------
-        conect_data : ``dict``
+        conect_data : :class:`dict`
             A dictionary containing the data parsed from the
             CONECT records.
         """
@@ -708,8 +708,7 @@ class PDBParser:
         with open(file, "r") as f:
 
             # Log the fact that we are getting the connectivity data.
-            debugstr = \
-                "Now getting the connectivity data..."
+            debugstr = "Now getting the connectivity data..."
             logger.debug(debugstr)
 
             # For each line in the file (start enumerating from 1)
@@ -733,7 +732,7 @@ class PDBParser:
                 # Get the record's header.
                 header = line[0:6]
 
-                # Log the current record for debug purporses.
+                # Log the current record for debug purposes.
                 debugstr = \
                     f"Now parsing the '{header}' record on line " \
                     f"{line_ix}..."
@@ -845,12 +844,12 @@ class PDBParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The PDB file to be parsed.
 
         Returns
         -------
-        ssbond_data : ``dict``
+        ssbond_data : :class:`dict`
             A dictionary containing the data parsed from the SSBOND
             records.
         """
@@ -892,7 +891,7 @@ class PDBParser:
                 # Get the record's header.
                 header = line[0:6]
 
-                # Log the current record for debug purporses.
+                # Log the current record for debug purposes.
                 debugstr = \
                     f"Now parsing the '{header}' record on line " \
                     f"{line_ix}..."
@@ -984,16 +983,16 @@ class PDBParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The PDB file to be parsed.
 
-        only_alt_loc : ``str``, ``"A"``
+        only_alt_loc : :class:`str`, ``"A"``
             For atoms having multiple alternate locations, keep only
             those with ``only_alt_loc`` alternate location.
 
         Returns
         -------
-        link_data : ``dict``
+        link_data : :class:`dict`
             A dictionary containing the data parsed from the LINK
             records.
         """
@@ -1034,7 +1033,7 @@ class PDBParser:
                 # Get the record's header.
                 header = line[0:6].strip()
 
-                # Log the current record for debug purporses.
+                # Log the current record for debug purposes.
                 debugstr = \
                     f"Now parsing the '{header}' record on line " \
                     f"{line_ix}..."
@@ -1157,25 +1156,25 @@ class PDBParser:
 
         Parameters
         ----------
-        conect_data : ``dict``
+        conect_data : :class:`dict`
             A dictionary containing the data parsed from the
             CONECT records.
 
-        ssbond_data : ``dict``
+        ssbond_data : :class:`dict`
             A dictionary containing the data parsed from the
             SSBOND records.
 
-        link_data : ``dict``
+        link_data : :class:`dict`
             A dictionary containing the data parsed from the
             LINK records.
 
-        oldids2newids : ``dict``
+        oldids2newids : :class:`dict`
             A dictionary mapping the atoms' original identifiers to
             the ones used in the structure.
 
         Returns
         -------
-        all_conect : ``dict``
+        all_conect : :class:`dict`
             A dictionary containing all the connectivity data.
         """
 
@@ -1442,33 +1441,33 @@ class PDBParser:
 
         Parameters
         ----------
-        file : ``str``
+        file : :class:`str`
             The PDB file to be parsed.
 
-        only_alt_loc : ``str``, ``"A"``
+        only_alt_loc : :class:`str`, ``"A"``
             For atoms having multiple alternate locations, keep only
             those with ``only_alt_loc`` alternate location.
 
-        parse_conect_data : ``bool``, ``True``
+        parse_conect_data : :class:`bool`, ``True``
             Whether to parse CONECT records.
 
-        parse_ssbond_data : ``bool``, ``True``
+        parse_ssbond_data : :class:`bool`, ``True``
             Whether to parse SSBOND records.
 
-        parse_link_data : ``bool``, ``True``
+        parse_link_data : :class:`bool`, ``True``
             Whether to parse LINK records.
-
-        is_extended_pdb: ``bool``, ``False``
+        
+        ist_extended_pdb : :class:`bool`, ``False``
             Whether the PDB file follows the "extended" PDB format,
             where the field usually reserved for a residue's
-            insertion code is used as an additional fied to store
+            insertion code is used as an additional field to store
             the residue's sequence number.
 
-        fix_residues_overflow : ``bool``, ``True``
+        fix_residues_overflow : :class:`bool`, ``True``
             If the PDB file resets the residue numbering mid-chain
             (which can happen when a chain has more than 9999
             residues and the program writing the file could not
-            hande it properly), automatically fix the issue by
+            handle it properly), automatically fix the issue by
             continuing the numbering past 9999.
 
             If ``True``, a warning will be raised and the numbering

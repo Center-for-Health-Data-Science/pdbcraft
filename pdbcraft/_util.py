@@ -5,7 +5,7 @@
 #
 #    Private miscellanea utilities.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -42,19 +42,19 @@ def sort_keys_at_depths(d,
     
     Parameters
     ----------
-    d : ``dict``
+    d : :class:`dict`
         The dictionary to be processed.
 
-    depths : ``list``
+    depths : :class:`list`
         A list of depths at which to sort the keys.
 
     Returns
     -------
-    d : ``dict``
+    d : :class:`dict`
         The dictionary with sorted keys at the specified depths.
     """
 
-    # Define the recursive step
+    # Define the recursive step.
     def recurse(d,
                 depths,
                 current_depth):

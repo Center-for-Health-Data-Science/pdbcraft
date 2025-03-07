@@ -5,7 +5,7 @@
 #
 #    Utilities to manipulate atomic structures.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software: you can redistribute it and/or
@@ -67,30 +67,36 @@ class Structure:
 
     # Set the ['_items', '_attributes'] depth for each level of the
     # hierarchy.
-    _ITEMSATTRS_DEPTH_TO_LEVELS = \
-        {# Models' level - ['_items', '_attributes']
-         2: "models",
-         # Chains' level - ['_items', '_attributes']
-         4: "chains",
-         # Segments' level - ['_items', '_attributes']
-         6: "segments",
-         # Residues' level - ['_items', '_attributes']
-         8: "residues",
-         # Atoms' level - ['_items', '_attributes']
-         10: "atoms"}
+    _ITEMSATTRS_DEPTH_TO_LEVELS = {
+        
+        # Models' level - ['_items', '_attributes']
+        2: "models",
+        # Chains' level - ['_items', '_attributes']
+        4: "chains",
+        # Segments' level - ['_items', '_attributes']
+        6: "segments",
+        # Residues' level - ['_items', '_attributes']
+        8: "residues",
+        # Atoms' level - ['_items', '_attributes']
+        10: "atoms",
+
+    }
 
     # Set the identifiers' depth for each level of the hierarchy.
-    _IDS_DEPTH_TO_LEVELS = \
-        {# Models' level
-         1 : "models",
-         # Chains' level
-         3 : "chains",
-         # Segments' level
-         5 : "segments", 
-         # Residues' level
-         7 : "residues",
-         # Atoms' level
-         9 : "atoms"}
+    _IDS_DEPTH_TO_LEVELS = {
+
+        # Models' level
+        1 : "models",
+        # Chains' level
+        3 : "chains",
+        # Segments' level
+        5 : "segments", 
+        # Residues' level
+        7 : "residues",
+        # Atoms' level
+        9 : "atoms",
+    
+    }
 
 
     ###################################################################
@@ -104,15 +110,15 @@ class Structure:
 
         Parameters
         ----------
-        atom_data : ``dict``, optional
+        atom_data : :class:`dict`, optional
             A nested dictionary containing the atomic coordinates
             of the structure.
 
-        conect_data : ``dict``, optional
+        conect_data : :class:`dict`, optional
             A nested dictionary containing the connectivity data
             for the structure.
 
-        name : ``str``, optional
+        name : :class:`str`, optional
             The name of the structure.
 
         Notes
@@ -224,6 +230,21 @@ class Structure:
     def _recursive_getitem(self,
                            struct,
                            path):
+        """Recursively get items from a structure.
+
+        Parameters
+        ----------
+        struct : :class:`dict`
+            The structure to get items from.
+        
+        path : ``tuple``
+            The path to the items to get.
+
+        Returns
+        -------
+        d : :class:`dict`
+            The last key in the path and the associated value.
+        """
 
         # Define the recursion as an inner function.
         def recurse(struct,
@@ -419,16 +440,16 @@ class Structure:
 
         Parameters
         ----------
-        model : ``int``, optional
+        model : :class:`int`, optional
             The model.
 
-        chain : ``str``, optional
+        chain : :class:`str`, optional
             The chain.
 
-        segment : ``str``, optional
+        segment : :class:`str`, optional
             The segment.
 
-        residue : ``tuple``, optional
+        residue : :class:`tuple`, optional
             The residue.
         """
 
@@ -530,16 +551,16 @@ class Structure:
 
         Parameters
         ----------
-        key : ``int``, ``str``, ``tuple``
+        key : :class:`int`, :class:`str`, :class:`tuple`
             The key we have to check to see if we are at the correct
             model, chain, segment, or residue.
 
-        value : ``dict``
+        value : :class:`dict`
             The dictionary we have to check to see if the attributes
             of the model, chain, segment, or residue have any
             of the accepted values.
 
-        selected : ``dict``
+        selected : :class:`dict`
             A dictionary containing the models, chains, segments, and
             residues through which we should recurse.
 
@@ -547,12 +568,12 @@ class Structure:
             chains, segments, and residues should have (if they exist)
             for us to recurse through them.
 
-        current_depth : ``int``
+        current_depth : :class:`int`
             The depth we are currently at in the recursion.
 
         Returns
         -------
-        should_recurse : ``bool``
+        should_recurse : :class:`bool`
             Whether we should recurse through the current sub-structure
             of the 'atom_data' dictionary.
         """
@@ -646,57 +667,57 @@ class Structure:
 
         Parameters
         ----------
-        models : ``list``, optional
+        models : :class:`list`, optional
             The models to be considered.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary of attributes and their accepted values.
             
             Only models whose values for the specified attributes
             (if they exist) are among the accepted values will be
             considered.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The chains to be considered.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary of attributes and their accepted values.
             
             Only chains whose values for the specified attributes
             (if they exist) are among the accepted values will be
             considered.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The segments to be considered.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary of attributes and their accepted values.
             
             Only segments whose values for the specified attributes
             (if they exist) are among the accepted values will be
             considered.
 
-        residues : ``list``, optional
+        residues : :class:`list`, optional
             The residues to be considered.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary of attributes and their accepted values.
             
             Only residues whose values for the specified attributes
             (if they exist) are among the accepted values will be
             considered.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             The atoms to be considered.
 
-        atoms_attributes : ``dict``, optional
+        atoms_attributes : :class:`dict`, optional
             A dictionary of attributes and their accepted values.
             
             Only atoms whose values for the specified attributes
             (if they exist) are among the accepted values will be
             considered.
 
-        extra_residues : ``dict``, optional
+        extra_residues : :class:`dict`, optional
             A dictionary containing ``"protein"``, ``"dna"``, 
             ``"rna"``, or ``"het"`` residues to be considered part
             of the canonical sets for these entities, despite not
@@ -731,7 +752,7 @@ class Structure:
 
             #---------------------------------------------------------#
 
-            # If the user requested heteoresidues
+            # If the user requested heteroresidues
             if "het" in residues:
 
                 # If there are no residues' attributes yet
@@ -835,32 +856,38 @@ class Structure:
         # attributes - add an empty list if there are no selected
         # items for a given level of the hierarchy, and an empty
         # dictionary if there are no selected attributes.
-        return \
-            {"models" : \
+        return {
+            
+            "models" : \
               {"_items" : \
                  models if models else [],
                "_attributes" : \
                  models_attributes if models_attributes else {}},
-             "chains" : \
+             
+            "chains" : \
                {"_items" : \
                   chains if chains else [],
                 "_attributes" : \
                   chains_attributes if chains_attributes else {}},
-             "segments" : \
+             
+            "segments" : \
                {"_items" : \
                   segments if segments else [],
                 "_attributes" : \
                   segments_attributes if segments_attributes else {}},
-             "residues" : \
+             
+            "residues" : \
                {"_items" : \
                   residues if residues else [],
                 "_attributes" : \
                   residues_attributes if residues_attributes else {}},
-             "atoms" : \
+             
+            "atoms" : \
                {"_items" : \
                   atoms if atoms else [],
                 "_attributes" : \
-                  atoms_attributes if atoms_attributes else {}}}
+                  atoms_attributes if atoms_attributes else {}},
+        }
 
 
     def _add_bonds(self,
@@ -871,7 +898,7 @@ class Structure:
 
         Parameters
         ----------
-        bonds : ``list``
+        bonds : :class:`list`
             A list of tuples, each representing a bond between two
             atoms. The tuple must contain the first atom, the
             second atom, the bond's type and the bond's order.
@@ -904,7 +931,7 @@ class Structure:
             for each bond specified, the connectivity data for
             both atoms involved in the bond will be updated.
 
-        bonds_attributes : ``dict``, optional
+        bonds_attributes : :class:`dict`, optional
             A dictionary mapping each bond in ``bonds`` to a dictionary
             of attributes that will be assigned to the bond.
         """
@@ -1061,13 +1088,13 @@ class Structure:
 
         Parameters
         ----------
-        path : ``tuple``
+        path : :class:`tuple`
             The 'path' to the atom (the model, chain, segment, and
             residue it belongs to, plus the atom's name).
 
         Returns
         -------
-        atom_serial : ``int```
+        atom_serial : :class:`int`
             The serial number of the atom the 'path' points to.
         """
         
@@ -1129,7 +1156,7 @@ class Structure:
 
         Parameters
         ----------
-        oldids2newids : ``dict``, optional
+        oldids2newids : :class:`dict`, optional
             A dictionary mapping the old identifiers for models, chains
             segments, residues, or atoms, to the new ones after
             renaming or renumbering the corresponding items.
@@ -1138,7 +1165,7 @@ class Structure:
             item (plus the item's identifier) before the modification
             and after.
 
-        start : ``int``, ``1``
+        start : :class:`int`, ``1``
             The new starting number for the atoms' serial numbers.
         """
 
@@ -1269,7 +1296,7 @@ class Structure:
                             # If the current model is in the mapping
                             if (mod,) in oldids2newids:
 
-                                # Susbtitute it with the new one.
+                                # Substitute it with the new one.
                                 mod = oldids2newids[(mod,)][0]
 
                     #-------------------------------------------------#
@@ -1373,11 +1400,11 @@ class Structure:
 
         Parameters
         ----------
-        atom_path : ``tuple``
+        atom_path : :class:`tuple`
             The 'path' to the point in the structure where the atom
             should be added.
 
-        atom_attributes : ``dict``
+        atom_attributes : :class:`dict`
             A dictionary of attributes for the atom.
         """
 
@@ -1577,7 +1604,7 @@ class Structure:
 
         Parameters
         ----------
-        action : ``str``, {``"get_unique"``, ``"get_max"``, \
+        action : :class:`str`, {``"get_unique"``, ``"get_max"``, \
             ``"get_min"``}
             The name of the 'get' action to perform:
 
@@ -1593,11 +1620,11 @@ class Structure:
               elements of a specific type or the maximum value found
               for a specific attribute.
 
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}
             At what level of the hierarchy we are getting the elements.
 
-        squeeze : ``str``, {``"models"``, ``"chains"``, \
+        squeeze : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}
             At which level of the hierarchy items should be 'squeezed',
             meaning that the 'get' action will involve all values found
@@ -1618,20 +1645,20 @@ class Structure:
             The hierarchy goes: models > chains > segments > residues >
             atoms.
 
-        elements_type : ``str``, {``"items"``, ``"attributes"``}
+        elements_type : :class:`str`, {``"items"``, ``"attributes"``}
             The type of elements we are retrieving.
 
-        selected : ``dict``
+        selected : :class:`dict`
             The dictionary containing items (selected by either their
             IDs or by their attributes) that will be considered in
             the 'get' action.
 
-        attribute : ``str``, optional
+        attribute : :class:`str`, optional
             The name of the attribute whose values should be retrieved.
 
         Returns
         -------
-        result : ``dict``
+        result : :class:`dict`
             A dictionary containing the result of the 'get' action
             performed.
         """
@@ -1813,7 +1840,7 @@ class Structure:
                     # If wee need to consider the item
                     if to_consider:
 
-                        # Add the item and associted dictionary to the
+                        # Add the item and associated dictionary to the
                         # items to be considered.
                         considered_items[item] = item_dict
 
@@ -2011,7 +2038,7 @@ class Structure:
 
         #-------------------------------------------------------------#
 
-        # Get the target depth from the 'level' keword.
+        # Get the target depth from the 'level' keyword.
         target_depth = \
             {v : k for k, v \
              in self._ITEMSATTRS_DEPTH_TO_LEVELS.items()}[level] - 2
@@ -2276,26 +2303,26 @@ class Structure:
 
         Parameters
         ----------
-        struct : ``dict``
+        struct : :class:`dict`
             Either the full 'atom_data' dictionary or a portion of it.
 
-        selected_items : ``list``
+        selected_items : :class:`list`
             A list of items to be kept.
 
-        selected_attrs : ``dict``
+        selected_attrs : :class:`dict`
             A dictionary mapping each attribute of interest to a list
             of values for the attribute.
 
             Only items for which the attribute's value is among the
             ones in the list will be kept.
 
-        current_depth : ``int``
+        current_depth : :class:`int`
             An integer representing the depth we are currently at in
             the 'atom_data' dictionary.
 
         Returns
         -------
-        kept_items : ``dict``
+        kept_items : :class:`dict`
             A dictionary containing the items to be kept and their
             attributes.
         """
@@ -2322,7 +2349,7 @@ class Structure:
                 selected_items = list(struct["_items"].keys())
             
             # The items to check will be the ones in the '_items'
-            # dictioanary.
+            # dictionary.
             items_to_check = struct["_items"]
 
         #-------------------------------------------------------------#
@@ -2390,7 +2417,7 @@ class Structure:
             # If wee need to keep the item
             if to_keep:
 
-                # Add the item and associted dictionary to the
+                # Add the item and associated dictionary to the
                 # items to be kept.
                 kept_items[item] = item_dict
 
@@ -2424,26 +2451,26 @@ class Structure:
 
         Parameters
         ----------
-        struct : ``dict``
+        struct : :class:`dict`
             Either the full 'atom_data' dictionary or a portion of it.
 
-        selected_items : ``list``
+        selected_items : :class:`list`
             A list of items to be removed.
 
-        selected_attrs : ``dict``
+        selected_attrs : :class:`dict`
             A dictionary mapping each attribute of interest to a list
             of values for the attribute.
 
             Only items for which the attribute's value is not among the
             ones in the list will be kept.
 
-        current_depth : ``int``
+        current_depth : :class:`int`
             An integer representing the depth we are currently at in
             the 'atom_data' dictionary.
 
         Returns
         -------
-        kept_items : ``dict``
+        kept_items : :class:`dict`
             A dictionary containing the items to be kept and their
             attributes.
         """
@@ -2459,7 +2486,7 @@ class Structure:
         else:
             
             # The items to check for removal will be the ones in the
-            # '_items' dictioanary.
+            # '_items' dictionary.
             items_to_check = struct["_items"]
 
         # If no selected items were provided
@@ -2572,53 +2599,54 @@ class Structure:
 
         Parameters
         ----------
-        struct : ``dict``
+        struct : :class:`dict`
             Either the full 'atom_data' dictionary or a portion of it.
 
-        selected_items : ``list``
+        selected_items : :class:`list`
             A list of items to be renamed or for which an attribute's
             value will be reassigned.
 
-        selected_attrs : ``dict``
+        selected_attrs : :class:`dict`
             A dictionary mapping each attribute of interest to a list
             of values for the attribute.
 
             Only items for which the attribute's value is among the
             ones in the list will be renamed.
 
-        mapping : ``dict``
+        mapping : :class:`dict`
             A dictionary mapping the old names to the new names.
 
-        elements_type : ``str``, {``"items"``, ``"attributes"``}
+        elements_type : :class:`str`, {``"items"``, ``"attributes"``}
             Whether the renaming needs to be performed on items or
             attributes.
 
-        attribute : ``str``, optional
+        attribute : :class:`str`, optional
             The name of the attribute to be renamed or to which
-            a new value shoud be assigned, if we are doing either
+            a new value should be assigned, if we are doing either
             thing.
 
-        new_value : ``str``, ``int``, ``float``, ``tuple``
+        new_value : :class:`str`, :class:`int`, :class:`float`, \
+            :class:`tuple`
             The new value for the attribute, if we are assigning a new
             value to an attribute.    
 
-        current_depth : ``int``
+        current_depth : :class:`int`
             An integer representing the depth we are currently at in
             the 'atom_data' dictionary.
 
-        current_path : ``tuple``
+        current_path : :class:`tuple`
             The 'path' to the point in the 'atom_data' dictionary we
             are currently at (in terms of keys in the 'atom_data'
             dictionary that we need to traverse in order to reach the
             current point).
 
-        oldids2newids : ``dict``
+        oldids2newids : :class:`dict`
             A dictionary mapping the old identifiers to the new
             identifiers, in case we are renaming items.
 
         Returns
         -------
-        updated_items : ``dict``
+        updated_items : :class:`dict`
             A dictionary containing the updated items and their
             attributes.
         """
@@ -2646,7 +2674,7 @@ class Structure:
                 selected_items = list(struct["_items"].keys())
             
             # The items to check will be the ones in the '_items'
-            # dictioanary.
+            # dictionary.
             items_to_check = struct["_items"]
 
         #-------------------------------------------------------------#
@@ -2742,7 +2770,7 @@ class Structure:
                         
                         # Update the dictionary mapping the old
                         # identifiers to the new identifiers with
-                        # the old and new name of the atomn (we are
+                        # the old and new name of the atom (we are
                         # sure the path is at least two items long,
                         # because we are at the depth where the atoms
                         # are if we encounter this attribute).
@@ -2805,7 +2833,7 @@ class Structure:
                 if item[2] in mapping:
 
                     # Assemble the new identifier by substituting the
-                    # residue's original name with the corresponging
+                    # residue's original name with the corresponding
                     # name found in the mapping, and leaving the
                     # residue's sequence number and insertion code
                     # unchanged.
@@ -2863,7 +2891,7 @@ class Structure:
                 else:
 
                     # Update the mapping between the old models'
-                    # identifiers and the new models' idenfitiers.
+                    # identifiers and the new models' identifiers.
                     oldids2newids[(item,)] = (mapping[item],)
 
                 # Go to the next item
@@ -2905,29 +2933,29 @@ class Structure:
 
         Parameters
         ----------
-        struct : ``dict``
+        struct : :class:`dict`
             Either the full 'atom_data' dictionary or a portion of it.
 
-        start : ``imt``
+        start : :class:`int`
             The new starting point for the renumbering. 
 
-        current_depth : ``int``
+        current_depth : :class:`int`
             An integer representing the depth we are currently at in
             the 'atom_data' dictionary.
 
-        current_path : ``tuple``
+        current_path : :class:`tuple`
             The 'path' to the point in the 'atom_data' dictionary we
             are currently at (in terms of keys in the 'atom_data'
             dictionary that we need to traverse in order to reach the
             current point).
 
-        oldids2newids : ``dict``
+        oldids2newids : :class:`dict`
             A dictionary mapping the old identifiers to the new
             identifiers, in case we are renaming items.
 
         Returns
         -------
-        updated_items : ``dict``
+        updated_items : :class:`dict`
             A dictionary containing the updated items and their
             attributes.
         """
@@ -2942,7 +2970,7 @@ class Structure:
         else:
             
             # The items to check will be the ones in the '_items'
-            # dictioanary in the current structure.
+            # dictionary in the current structure.
             items_to_check = struct["_items"]
 
         #-------------------------------------------------------------#
@@ -3051,8 +3079,8 @@ class Structure:
 
         Parameters
         ----------
-        action : ``str``, {``"keep"``, ``"remove"``, ``"rename"``, \
-            ``"renumber"``, ``"assign"``}
+        action : :class:`str`, {``"keep"``, ``"remove"``, \
+            ``"rename"``, ``"renumber"``, ``"assign"``}
             The modification to be performed on the 'atom_data'
             dictionary:
 
@@ -3063,36 +3091,36 @@ class Structure:
             - ``"renumber"`` renumbers selected items, given a new
               starting number.
 
-        elements_type : ``str``, {``"items"``, ``"attributes"``}
+        elements_type : :class:`str`, {``"items"``, ``"attributes"``}
             Whether the ``action`` at ``level`` needs to
             be performed on items or attributes.
 
-        selected : ``dict``
+        selected : :class:`dict`
             A dictionary of models, chains, segments, residues, and
             atoms considered during the modification, and which
             values specific model, chain, segment, residue, or atom
             attributes the items should have for them to be
             considered.
 
-        level : ``str``, {``"models"``, ``"chains"``, ``"segments"``, \
-            ``"residues"``, ``"atoms"``}, optional
+        level : :class:`str`, {``"models"``, ``"chains"``, \
+            ``"segments"``, ``"residues"``, ``"atoms"``}, optional
             At what level of the hierarchy the ``action`` should be
             performed, if ``action`` is ``"rename"``, ``"renumber"``,
             or ``"assign"``.
 
-        mapping : ``dict``, optional
+        mapping : :class:`dict`, optional
             A dictionary mapping the old names to the new names,
             when ``action = "rename"``.
 
-        start : ``int``, optional
+        start : :class:`int`, optional
             The new starting number, when ``action = "renumber"``.
 
-        attribute : ``str``, optional
+        attribute : :class`str`, optional
             The name of the attribute to be renamed, if
             ``action = "rename"`` and ``elements_type = "attributes"``.
 
-        new_value : ``str``, ``int``, ``float``, ``tuple``, \
-            optional
+        new_value : :class:`str`, :class:`int`, :class:`float`, \
+            :class:`tuple`, optional
             The new value for the attribute, if ``action = "assign"``
             and ``elements_type = "attributes"``. 
         """
@@ -3418,14 +3446,15 @@ class Structure:
 
         Parameters
         ----------
-        residue_name : ``str``
+        residue_name : :class:`str`
             The name of the residues whose atoms will be sorted.
 
-        atoms_names : ``list``
+        atoms_names : :class:`list`
             The names of the atoms in residues named ``residue_names``
             in the order they should be sorted.
 
-        other_atoms_position : ``str``, {``"before"``, ``"after"``}
+        other_atoms_position : :class:`str`, \
+            {``"before"``, ``"after"``}
             Where to put the atoms not included in ``atoms_names``, if
             found in the residues named ``residue_name``.
 
@@ -3626,7 +3655,7 @@ class Structure:
 
         Returns
         -------
-        models : ``generator``
+        models : generator
             A generator containing the models.
 
         Examples
@@ -3669,12 +3698,12 @@ class Structure:
 
         Parameters
         ----------
-        model : ``int``
+        model : :class:`int`
             The identifier of the model the chains belong to.
 
         Returns
         -------
-        chains : ``generator``
+        chains : generator
             A generator containing all chains in the selected model.
 
         Examples
@@ -3720,10 +3749,10 @@ class Structure:
 
         Parameters
         ----------
-        model : ``int``
+        model : :class:`int`
             The identifier of the model the segments belongs to.
 
-        chain : ``str``
+        chain : :class:`str`
             The identifier of the chain the segments belong to.
 
         Returns
@@ -3778,13 +3807,13 @@ class Structure:
 
         Parameters
         ----------
-        model : ``int``
+        model : :class:`int`
             The identifier of the model the residues belongs to.
 
-        chain : ``str``
+        chain : :class:`str`
             The identifier of the chain the residues belong to.
 
-        segment : ``str``
+        segment : :class:`str`
             The identifier of the segment the residues belong to.
 
         Returns
@@ -3847,16 +3876,16 @@ class Structure:
 
         Parameters
         ----------
-        model : ``int``
+        model : :class:`int`
             The identifier of the model the atoms belong to.
 
-        chain : ``str``
+        chain : :class:`str`
             The identifier of the chain the atoms belong to.
 
-        segment : ``str``
+        segment : :class:`str`
             The identifier of the segment the atoms belong to.
 
-        residue : ``tuple``
+        residue : :class:`tuple`
             The identifier of the residue the atoms belong to.
 
             The identifier is a tuple containing the residue's
@@ -3926,7 +3955,7 @@ class Structure:
 
         Parameters
         ----------
-        path : ``tuple``
+        path : :class:`tuple`
             The 'path' to the atom (the model, chain, segment, and
             residue it belongs to, plus the atom's name).
 
@@ -3939,7 +3968,7 @@ class Structure:
 
         Returns
         -------
-        atom_serial : ``int```
+        atom_serial : :class:`int`
             The serial number of the atom the 'path' points to.
 
         Examples
@@ -3988,7 +4017,7 @@ class Structure:
 
         Returns
         -------
-        ``struct_copy`` : :class:`pdbcraft.structure.Structure`
+        struct_copy : :class:`pdbcraft.structure.Structure`
             A copy of the current structure.
 
         Examples
@@ -4088,7 +4117,7 @@ class Structure:
 
         Parameters
         ----------
-        bonds : ``list``
+        bonds : :class:`list`
             A list of tuples, each representing a bond between two
             atoms. The tuple must contain the first atom, the
             second atom, the bond's type and the bond's order.
@@ -4106,12 +4135,14 @@ class Structure:
             ("A", "", (1, "", "MET"), "CA"), "covale", "sing")``.
 
             Supported bond types are:
+
             - ``"covale"`` for covalent bonds.
             - ``"disulf"`` for disulfide bridges.
             - ``"hydrog"`` for hydrogen bonds.
             - ``"metalc"`` for metal coordination.
 
             Supported bond orders are:
+
             - ``"sing"`` for single bonds.
             - ``"doub"`` for double bonds.
             - ``"trip"`` for triple bonds.
@@ -4121,18 +4152,19 @@ class Structure:
             for each bond specified, the connectivity data for
             both atoms involved in the bond will be updated.
 
-        bonds_attributes : ``dict``, optional
+        bonds_attributes : :class:`dict`, optional
             A dictionary mapping each bond in ``bonds`` to a dictionary
             of attributes that will be assigned to the bond.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
-            a new ``Structure`` will be returned.
+            a new :class:`pdbcraft.structure.Structure` will be
+            returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -4218,39 +4250,46 @@ class Structure:
 
         Parameters
         ----------
-        atom_path : ``tuple``
+        atom_path : :class:`tuple`
             The path to the point in the structure where the atom
             should be added.
 
-        atom_attributes : ``dict``
+        atom_attributes : :class:`dict`
             A dictionary containing the attributes for the atom.
             
             The dictionary must contain at least the following
             keys:
 
-            - 'label_atom_id', associated with the atom's name.
-            - 'label_alt_id', associated with the atom's alternate
+            - `label_atom_id`, associated with the atom's name.
+
+            - `label_alt_id`, associated with the atom's alternate
               location.
-            - 'label_entity_id', associated with the atom's
+
+            - `label_entity_id`, associated with the atom's
               entity ID.
-            - 'type_symbol', associated with the atom's type.
-            - 'Cartn_x', associated with the X coordinate of the
+
+            - `type_symbol`, associated with the atom's type.
+
+            - `Cartn_x`, associated with the X coordinate of the
               atom's position.
-            - 'Cartn_y', associated with the Y coordinate of the
+
+            - `Cartn_y`, associated with the Y coordinate of the
               atom's position.
-            - 'Cartn_z', associated with the Z coordinate of the
+
+            - `Cartn_z`, associated with the Z coordinate of the
               atom's position.
-            - 'pdbx_formal_charge', associated with the atom's
+
+            - `pdbx_formal_charge`, associated with the atom's
               charge.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -4361,11 +4400,11 @@ class Structure:
 
         Parameters
         ----------
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}
             At which level of the hierarchy we should retrieve items.
 
-        squeeze : ``str``, {``"models"``, ``"chains"``, \
+        squeeze : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}, optional
             At which level of the hierarchy items should be 'squeezed',
             meaning that the 'get' action will involve all values found
@@ -4386,16 +4425,18 @@ class Structure:
             The hierarchy goes: models > chains > segments > residues >
             atoms.
 
-        action : ``str``, {``"get_unique"``, ``"get_min"``, \
-            ``"get_max"``}, ``"get_unique"`` 
+        action : :class:`str`, {``"get_unique"``, ``"get_min"``, ``"get_max"``}, ``"get_unique"`` 
             The 'get' action to be performed:
-            - ``"get_unique"`` retrieves unique identifiers.
-            - ``"get_min"`` retrieves the minimum among the
-            identifiers.
-            - ``"get_max"`` retrieved the maximum among the
-            identifiers.
 
-        models : ``list``, optional
+            * ``"get_unique"`` retrieves unique identifiers.
+
+            * ``"get_min"`` retrieves the minimum among the
+              identifiers.
+
+            * ``"get_max"`` retrieved the maximum among the
+              identifiers.
+
+        models : :class:`list`, optional
             The unique models to be retrieved if ``level = "models"``.
 
             Otherwise, the models from which the selected chains,
@@ -4404,14 +4445,14 @@ class Structure:
 
             Each model is defined by its number.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes to lists
             of their accepted values.
 
             Only models whose attributes' values are among the accepted
             ones will be considered.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The unique models to be retrieved if ``level = "chains"``.
 
             Otherwise, the chains from which the selected segments,
@@ -4420,14 +4461,14 @@ class Structure:
 
             Each chain is defined by its identifier.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes to lists
             of their accepted values.
 
             Only chains whose attributes' values are among the accepted
             ones will be considered.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The unique segments to be retrieved if 
             ``level = "segments"``.
 
@@ -4437,14 +4478,14 @@ class Structure:
 
             Each segments is defined by its identifier.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes to lists
             of their accepted values.
 
             Only segments whose attributes' values are among the
             accepted ones will be considered.
 
-        residues : ``list``, optional
+        residues : :class:`list`, optional
             The unique residues to be retrieved if 
             ``level = "residues"``.
 
@@ -4456,7 +4497,7 @@ class Structure:
             tuple containing the residues' sequence number, insertion
             code, and name), its sequence number, or its name.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes to lists
             of their accepted values.
 
@@ -4464,12 +4505,12 @@ class Structure:
             accepted ones will be considered in the selected segments,
             chains, and models.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             The unique atoms to be retrieved if ``level = "atoms"``.
             
             Each atom is defined by its serial number.
 
-        atoms_attributes : ``dict``, optional
+        atoms_attributes : :class:`dict`, optional
             A dictionary mapping names of atoms' attributes to lists
             of their accepted values.
 
@@ -4584,24 +4625,25 @@ class Structure:
 
         Parameters
         ----------
-        attribute : ``str``
+        attribute : :class:`str`
             The name of the attribute.
 
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}
             At which level of the hierarchy the attribute belongs to.
 
-        action : ``str``, {``"get_unique"``, ``"get_min"``, \
+        action : :class:`str`, {``"get_unique"``, ``"get_min"``, \
             ``"get_max"``}, ``"get_unique"``
             The 'get' action to be performed:
-            - ``"get_unique"`` retrieves all unique values for the
-            attribute.
-            - ``"get_min"`` retrieves the minimum value of the
-            attribute.
-            - ``"get_max"`` retrieved the maximum value of the
-            attribute.
 
-        squeeze : ``str``, {``"models"``, ``"chains"``, \
+            * ``"get_unique"`` retrieves all unique values for the
+              attribute.
+            * ``"get_min"`` retrieves the minimum value of the
+              attribute.
+            * ``"get_max"`` retrieved the maximum value of the
+              attribute.
+
+        squeeze : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}, optional
             At which level of the hierarchy items should be 'squeezed',
             meaning that the 'get' action will involve all values found
@@ -4622,7 +4664,7 @@ class Structure:
             The hierarchy goes: models > chains > segments > residues >
             atoms.
 
-        models : ``list``, optional
+        models : :class:`list`, optional
             If ``level = "models"``, the models whose ``attribute``
             values need to be retrieved.
 
@@ -4632,7 +4674,7 @@ class Structure:
 
             Each model is defined by its number.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes to lists
             of their accepted values.
 
@@ -4641,7 +4683,7 @@ class Structure:
 
             This option is ignored if ``level = "models"``.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             If ``level = "chains"``, the chains whose ``attribute``
             values need to be retrieved.
 
@@ -4653,7 +4695,7 @@ class Structure:
 
             This option is ignored if ``level = "models"``.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes to lists
             of their accepted values.
 
@@ -4662,7 +4704,7 @@ class Structure:
 
             This option is ignored if ``level = "chains"`` or above.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             If ``level = "segments"``, the segments whose ``attribute``
             values need to be retrieved.
 
@@ -4674,7 +4716,7 @@ class Structure:
 
             This option is ignored if ``level = "chains"`` or above.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes to lists
             of their accepted values.
 
@@ -4683,7 +4725,7 @@ class Structure:
 
             This option is ignored if ``level = "segments"`` or above.
 
-        residues : ``list``, optional
+        residues : :class:`list`, optional
             If ``level = "residues"``, the residues whose ``attribute``
             values need to be retrieved.  
 
@@ -4697,7 +4739,7 @@ class Structure:
 
             This option is ignored if ``level = "segments"`` or above.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes to lists
             of their accepted values.
 
@@ -4707,7 +4749,7 @@ class Structure:
 
             This option is ignored if ``level = "residues"`` or above.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             If ``level = "atoms"``, the atoms whose ``attribute``
             values need to be retrieved.  
             
@@ -4809,42 +4851,42 @@ class Structure:
 
         Parameters
         ----------
-        models : ``list``, optional
+        models : :class:`list`, optional
             The models to be kept.
 
             Each model is defined by its number.
 
             If not provided, all models will be kept.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes to lists
             of their accepted values.
 
             Only models whose attributes' values are among the accepted
             ones will be kept.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The chains to be kept in the selected models.
             
             Each chain is defined by its chain identifier.
 
             If not provided, all chains will be kept.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes to lists
             of their accepted values.
 
             Only chains whose attributes' values are among the accepted
             ones will be kept in the selected models.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The segments to be kept in the selected models and chains.
             
             Each segment is defined by its segment identifier.
 
             If not provided, all segments will be kept.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes to lists
             of their accepted values.
 
@@ -4852,7 +4894,7 @@ class Structure:
             accepted ones will be kept in the selected models and
             chains.
 
-        residues : ``list``, optional
+        residues : :class:`list`, optional
             The residues to be kept in the selected models, chains,
             and segments.
 
@@ -4868,7 +4910,7 @@ class Structure:
 
             If not provided, all residues will be kept.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes to lists
             of their accepted values.
 
@@ -4876,7 +4918,7 @@ class Structure:
             accepted ones will be kept in the selected segments,
             chains, and models.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             The atoms to be kept in the selected models, chains,
             segments, and residues.
             
@@ -4884,7 +4926,7 @@ class Structure:
             
             If not provided, all atoms will be kept.
 
-        atoms_attributes : ``dict``, optional
+        atoms_attributes : :class:`dict`, optional
             A dictionary mapping names of atoms' attributes to lists
             of their accepted values.
 
@@ -4892,14 +4934,14 @@ class Structure:
             ones will be kept in the selected models, chains, segments,
             and residues.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -5021,7 +5063,7 @@ class Structure:
 
         Parameters
         ----------
-        models : ``list``, optional
+        models : :class:`list`, optional
             The models to be removed if no chains, segments, residues,
             atoms, or any of their attributes are specified.
 
@@ -5032,14 +5074,14 @@ class Structure:
 
             If not provided, all models will be considered.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes to lists
             of values the attributes can have.
 
             Only items in models whose attributes' values are among
             the ones provided will be considered for removal.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The chains to be removed if no segments, residues, atoms,
             or any of their attributes are specified.
 
@@ -5051,14 +5093,14 @@ class Structure:
             If not provided, all chains in the selected models will be
             considered.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes to lists
             of values the attributes can have.
 
             Only items in chains whose attributes' values are among the
             ones provided will be considered for removal.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The segments to be removed if no residues, atoms, or any
             of their attributes are specified.
 
@@ -5070,14 +5112,14 @@ class Structure:
             If not provided, all segments in the selected chains and
             models will be considered.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes to lists
             of values the attributes can have.
 
             Only items in segments whose attributes' values are among
             the ones provided will be considered for removal.
 
-        residues : ``list``, optional
+        residues : :class:`list`, optional
             The residues to be removed if no atoms or any of their
             attributes are specified.
 
@@ -5093,14 +5135,14 @@ class Structure:
             If not provided, all residues in the selected models,
             chains, and segments will be considered.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes to lists
             of values the attributes can have.
 
             Only atoms in residues whose attributes' values are among
             the ones provided will be considered for removal.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             The atoms to be removed in the selected models, chains,
             segments, and residues.
             
@@ -5109,7 +5151,7 @@ class Structure:
             If not provided, all atoms in the selected models, chains,
             segments, and residues will be considered.
 
-        atoms_attributes : ``dict``, optional
+        atoms_attributes : :class:`dict`, optional
             A dictionary mapping names of atoms' attributes to lists
             of values they can have.
 
@@ -5117,9 +5159,9 @@ class Structure:
             residues) whose attributes' values are among the ones
             provided will be considered for removal.
 
-        extra_residues : ``dict``, optional
+        extra_residues : :class:`dict`, optional
             A dictionary of names of residues that are not part of
-            the canonital sets of protein, DNA, and RNA residues,
+            the canonical sets of protein, DNA, and RNA residues,
             but that should be considered as such. The dictionary
             accepts three keywords:
 
@@ -5130,14 +5172,14 @@ class Structure:
             - ``"rna"``, mapped to a list of names of extra RNA
               residues.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -5260,15 +5302,15 @@ class Structure:
 
         Parameters
         ----------
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues"``, ``"atoms"``}
             Where the items to be renamed are in the hierarchy.
 
-        mapping : ``dict``
+        mapping : :class:`dict`
             A dictionary containing the mapping between the old
             names and the new ones.
 
-        models : ``list``, optional
+        models : :class:`list`, optional
             The models to be considered when renaming.
             
             If no chains, segments, residues, or atoms are
@@ -5282,7 +5324,7 @@ class Structure:
 
             If not provided, all models will be considered.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes
             to lists of their accepted values.
 
@@ -5291,7 +5333,7 @@ class Structure:
             values match the accepted ones will be considered
             for renaming. 
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The chains to be considered when renaming.
             
             If no segments, residues, or atoms are provided,
@@ -5306,7 +5348,7 @@ class Structure:
             If not provided, all chains in the selected
             models will be considered.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes
             to lists of their accepted values.
 
@@ -5314,7 +5356,7 @@ class Structure:
             elements in chains whose attributes' values match the
             accepted ones will be considered for renaming. 
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The segments to be considered when renaming.
             
             If no residues or atoms are provided, the mapping
@@ -5329,7 +5371,7 @@ class Structure:
             If not provided, all segments in the selected models
             and chains will be considered.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes
             to lists of their accepted values.
 
@@ -5337,7 +5379,7 @@ class Structure:
             in segments whose attributes' values match the
             accepted ones will be considered for renaming.
 
-        residues : ``set``, optional
+        residues : :class:`set`, optional
             The residues to be considered when renaming.
             
             If no atoms are provided, the mapping
@@ -5353,7 +5395,7 @@ class Structure:
             If not provided, all residues in the selected models,
             chains, and segments will be considered.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes
             to lists of their accepted values.
 
@@ -5361,7 +5403,7 @@ class Structure:
             residues whose attributes' values match the
             accepted ones will be considered for renaming.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             The atoms to be renamed.
 
             If atoms are provided, the mapping will
@@ -5372,7 +5414,7 @@ class Structure:
             If not provided, all atoms in the selected models,
             chains, segments, and residues will be considered.
 
-        atoms_attributes : ``dict``, optional
+        atoms_attributes : :class:`dict`, optional
             A dictionary mapping names of atoms' attributes
             to lists of their accepted values.
 
@@ -5380,14 +5422,14 @@ class Structure:
             whose attributes' values match the accepted
             ones will be renamed.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -5484,15 +5526,15 @@ class Structure:
 
         Parameters
         ----------
-        start : ``int``
+        start : :class:`int`
             The new starting number.
 
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues", ``"atoms"``}
             The level of the hierarchy where the items to
             be renumbered are.
 
-        models : ``list``, optional
+        models : :class:`list`, optional
             The models to be considered when renumbering.
             
             If no chains, segments, or residues are provided,
@@ -5505,7 +5547,7 @@ class Structure:
 
             If not provided, all models will be considered.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes
             to lists of their accepted values.
 
@@ -5514,7 +5556,7 @@ class Structure:
             match the accepted ones will be considered for
             renumbering.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             The chains to be considered when renumbering.
             
             If no segments or residues are provided,
@@ -5529,7 +5571,7 @@ class Structure:
             If not provided, all chains in the selected
             models will be considered.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes
             to lists of their accepted values.
 
@@ -5537,7 +5579,7 @@ class Structure:
             elements in chains whose attributes' values match the
             accepted ones will be considered for renumbering. 
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             The segments to be considered when renumbering.
             
             If no residues are provided, the renumbering
@@ -5552,7 +5594,7 @@ class Structure:
             If not provided, all segments in the selected models
             and chains will be considered.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes
             to lists of their accepted values.
 
@@ -5560,7 +5602,7 @@ class Structure:
             in segments whose attributes' values match the
             accepted ones will be considered for renumbering.
 
-        residues : ``set``, optional
+        residues : :class:`set`, optional
             The residues to be considered when renumbering.
             
             If they are provided, they will be the items
@@ -5572,21 +5614,21 @@ class Structure:
             If not provided, all residues in the selected models,
             chains, and segments will be considered.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes
             to lists of their accepted values.
 
             Only residues whose attributes' values match the
             accepted ones will be considered for renumbering.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -5685,17 +5727,18 @@ class Structure:
 
         Parameters
         ----------
-        attribute : ``str``
+        attribute : :class:`str`
             The name of the attribute.
 
-        new_value : ``str``, ``int``, ``float``, ``tuple``
+        new_value : :class:`str`, :class:`int`, :class:`float`, \
+            :class:`tuple`
             The new value of the attribute
 
-        level : ``str``, {``"models"``, ``"chains"``, \
+        level : :class:`str`, {``"models"``, ``"chains"``, \
             ``"segments"``, ``"residues", ``"atoms"``}
             Where the attribute is in the hierarchy.
 
-        models : ``list``, optional
+        models : :class:`list`, optional
             If ``level = "models"``, the models whose
             ``attribute``'s value will be re-assigned.
 
@@ -5707,7 +5750,7 @@ class Structure:
 
             If not provided, all models will be considered.
 
-        models_attributes : ``dict``, optional
+        models_attributes : :class:`dict`, optional
             A dictionary mapping names of models' attributes
             to lists of their accepted values.
 
@@ -5718,7 +5761,7 @@ class Structure:
             match the accepted ones will be considered when
             re-assigning the attribute's value.
 
-        chains : ``list``, optional
+        chains : :class:`list`, optional
             If ``level = "chains"``, the chains whose
             ``attribute``'s value will be re-assigned.
 
@@ -5734,7 +5777,7 @@ class Structure:
             If not provided, all chains in the selected
             models will be considered.
 
-        chains_attributes : ``dict``, optional
+        chains_attributes : :class:`dict`, optional
             A dictionary mapping names of chains' attributes
             to lists of their accepted values.
 
@@ -5745,7 +5788,7 @@ class Structure:
             match the accepted ones will be considered when
             re-assigning the attribute's value.
 
-        segments : ``list``, optional
+        segments : :class:`list`, optional
             If ``level = "segments"``, the segments whose
             ``attribute``'s value will be re-assigned.
 
@@ -5761,7 +5804,7 @@ class Structure:
             If not provided, all segments in the selected models
             and chains will be considered.
 
-        segments_attributes : ``dict``, optional
+        segments_attributes : :class:`dict`, optional
             A dictionary mapping names of segments' attributes
             to lists of their accepted values.
 
@@ -5772,7 +5815,7 @@ class Structure:
             match the accepted ones will be considered when
             re-assigning the attribute's value.
 
-        residues : ``set``, optional
+        residues : :class:`set`, optional
             If ``level = "residues"``, the residues whose
             ``attribute``'s value will be re-assigned.
 
@@ -5789,7 +5832,7 @@ class Structure:
             If not provided, all residues in the selected models,
             chains, and segments will be considered.
 
-        residues_attributes : ``dict``, optional
+        residues_attributes : :class:`dict`, optional
             A dictionary mapping names of residues' attributes
             to lists of their accepted values.
 
@@ -5800,7 +5843,7 @@ class Structure:
             match the accepted ones will be considered when
             re-assigning the attribute's value.
 
-        atoms : ``list``, optional
+        atoms : :class:`list`, optional
             If ``level = "atoms"``, the atoms whose
             ``attribute``'s value will be re-assigned.
 
@@ -5811,14 +5854,14 @@ class Structure:
             If not provided, all atoms in the selected models,
             chains, segments, and residues will be considered.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------
@@ -5922,14 +5965,14 @@ class Structure:
 
         Parameters
         ----------
-        atoms_names : ``list``
+        atoms_names : :class:`list`
             A list of atoms' names defining the sorting order
             for the atoms.
 
-        residue_name : ``str``
+        residue_name : :class:`str`
             The name of residue whose atoms will be sorted.
 
-        other_atoms_position : ``str``, \
+        other_atoms_position : :class:`str`, \
             {``"before"``, ``"after"``}, ``"after"``
             In case more atoms that the ones specified in the
             list are found in a residue, where to place these
@@ -5945,14 +5988,14 @@ class Structure:
             match those provided in ``atoms_names`` will
             be placed after the sorted atoms.
 
-        in_place : ``bool``, ``False``
+        in_place : :class:`bool`, ``False``
             Whether to modify the structure in place. If ``False``,
             a new structure will be returned.
 
         Returns
         -------
-        :class:`pdbcraft.structure.Structure` if ``in_place`` is ``False``;
-        otherwise, ``None``.
+        :class:`pdbcraft.structure.Structure` if ``in_place`` is
+        ``False``; otherwise, ``None``.
 
         Examples
         --------

@@ -5,7 +5,7 @@
 #
 #    Writers for FASTA files.
 #
-#    Copyright (C) 2024 Valentina Sora 
+#    Copyright (C) 2025 Valentina Sora 
 #                       <sora.valentina1@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or
@@ -77,14 +77,14 @@ class FASTAWriter:
         struct : :class:`pdbcraft.structure.Structure`
             The structure whose sequence(s) will be extracted.
 
-        file : ``str``
+        file : :class:`str`
             The FASTA file to be written.
 
             If ``split_models`` or ``split_chains`` is ``True``, the
             name of the file is used as a prefix for the multiple
             FASTA files that will be written.
 
-        split_models : ``bool``, ``True``
+        split_models : :class:`bool`, ``True``
             If ``True``, one FASTA file for each model found in the
             structure will be written.
 
@@ -93,7 +93,7 @@ class FASTAWriter:
             ``split_models`` and ``split_chains`` affect the content of
             the output FASTA file(s).
 
-        split_chains : ``bool``, ``True``
+        split_chains : :class:`bool`, ``True``
             If ``True``, one FASTA file for each chain found in the
             structure will be written.
 
@@ -102,7 +102,7 @@ class FASTAWriter:
             ``split_models`` and ``split_chains`` affect the content of
             the output FASTA file(s).
 
-        disc_chains_mode : ``str``, {``"join"``, \
+        disc_chains_mode : :class:`str`, {``"join"``, \
             ``"join_with_caps"``, ``"split"``}, ``"join_with_caps"``
             How to represent discontinuous chains in the FASTA
             sequences.
@@ -125,23 +125,23 @@ class FASTAWriter:
             - ``"split"``: the discontinuous portions of the chain
               will be written as separate FASTA sequences.
 
-        res_i_code : ``str``, ``" "``
+        res_i_code : :class:`str`, ``" "``
             The insertion code of the residues that will be included in
             the FASTA sequences.
 
             If not provided, only residues without an insertion code
             will be included.
 
-        gap_char : ``str``, ``"-"``
+        gap_char : :class:`str`, ``"-"``
             The character used to represent gaps in the FASTA
             sequences, if ``disc_chains_mode`` is ``"join_with_caps"``.
 
-        wrap_at : ``int``, optional
+        wrap_at : :class:`int`, optional
             Wrap each FASTA sequence at ``wrap_at`` characters.
             
             If it is not provided, do not wrap the sequences.
 
-        resnames_mapping : ``dict``, optional
+        resnames_mapping : :class:`dict`, optional
             A dictionary containing the mapping between the residues'
             long-form names and their short-form (one letter) names.
 
@@ -294,8 +294,8 @@ class FASTAWriter:
                 # For each segment and associated data
                 for seg, seg_data in ch_data["_items"].items():
 
-                    # Initialize the variable storing the number
-                    # of the previous residue to None.
+                    # Initialize the variable storing the number of the
+                    # previous residue to None.
                     prev_res_num = None
 
                     #-------------------------------------------------#
@@ -463,7 +463,7 @@ class FASTAWriter:
                 # If we need to split chains but not models
                 elif not split_models and split_chains:
 
-                    # Set the name of the file thay will contain the
+                    # Set the name of the file that will contain the
                     # sequence of the current chain in each model.
                     file_name = f"{fasta_name}_{ch}{fasta_ext}"
 
